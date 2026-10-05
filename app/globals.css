@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 25% 99%;
+    --foreground: 220 10% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 10% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 11%;
+    --primary: 220 15% 12%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 100% 36%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 14% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 14% 96%;
+    --accent-foreground: 220 10% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 213 100% 36%;
+    --radius: 1rem;
+  }
+
+  body {
+    background-color: #faf9fe;
+    color: #1a1b1f;
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-headline {
+    font-family: var(--font-plus-jakarta), var(--font-inter), sans-serif;
+  }
+}
+
+/* Custom Scrollbar Hide */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Tabular Numerals for Finance */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Page transition — smooth content swap on route change */
+main > div {
+  animation: fadeSlideIn 0.18s ease-out both;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Skeleton shimmer override */
+.animate-pulse {
+  animation: pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+

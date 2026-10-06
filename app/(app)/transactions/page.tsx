@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Transaction, TransactionType, TransactionCategory } from "@/lib/types/database.types";
 import { formatCurrency, formatDate, getCategoryConfig } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
 import TransactionModal from "@/components/transactions/TransactionModal";
 import {
   Sparkles,
@@ -57,15 +58,13 @@ export default function TransactionsPage() {
 
   const fetchTransactions = async () => {
     setIsLoading(true);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const userId = getClientUserId();
 
-    if (session?.user) {
+    if (userId) {
       const { data, error } = await supabase
         .from("transactions")
         .select("id,type,amount,category,description,date,note,created_at")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .order("date", { ascending: false });
 
       if (!error && data) {
@@ -112,17 +111,15 @@ export default function TransactionsPage() {
     if (!parsedData) return;
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
 
-      if (!user) {
-        toast.error("Silakan masuk terlebih dahulu");
+      if (!userId) {
+        toast.error("Sesi tidak ditemukan");
         return;
       }
 
       const { error } = await supabase.from("transactions").insert({
-        user_id: user.id,
+        user_id: userId,
         type: parsedData.type,
         category: parsedData.category,
         amount: parsedData.amount,
@@ -146,11 +143,9 @@ export default function TransactionsPage() {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
 
-      if (!user) return;
+      if (!userId) return;
 
       const numAmount = Number(manualAmount.replace(/\D/g, ""));
       if (!numAmount || numAmount <= 0) {
@@ -159,7 +154,7 @@ export default function TransactionsPage() {
       }
 
       const { error } = await supabase.from("transactions").insert({
-        user_id: user.id,
+        user_id: userId,
         type: manualType,
         category: manualCategory,
         amount: numAmount,

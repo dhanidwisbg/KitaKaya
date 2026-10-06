@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SavingsGoal } from "@/lib/types/database.types";
 import { formatCurrency } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
 import { X, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,12 +36,10 @@ export default function DepositModal({
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
 
-      if (!user) {
-        toast.error("Silakan masuk terlebih dahulu");
+      if (!userId) {
+        toast.error("Sesi tidak ditemukan");
         return;
       }
 
@@ -54,7 +53,7 @@ export default function DepositModal({
       // 1. Insert into savings_transactions
       const { error: txError } = await supabase.from("savings_transactions").insert({
         goal_id: goal.id,
-        user_id: user.id,
+        user_id: userId,
         amount: numAmount,
         note: note.trim() || null,
       });
@@ -63,7 +62,7 @@ export default function DepositModal({
 
       // 2. Also record in transactions as savings expense
       await supabase.from("transactions").insert({
-        user_id: user.id,
+        user_id: userId,
         type: "expense",
         category: "savings",
         amount: numAmount,

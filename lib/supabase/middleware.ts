@@ -30,30 +30,37 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh session (IMPORTANT — do not remove)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Cek cookie sesi pengguna KitaKaya
+  const userCookie = request.cookies.get("kitakaya_user_id")?.value;
+  const hasUserSession = Boolean(userCookie);
 
   // Protected routes
-  const protectedPaths = ["/dashboard", "/transactions", "/savings", "/analytics", "/settings", "/onboarding"];
+  const protectedPaths = [
+    "/dashboard",
+    "/transactions",
+    "/savings",
+    "/goals",
+    "/analytics",
+    "/settings",
+    "/reports",
+  ];
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
-  // Auth routes (redirect away if already logged in)
-  const authPaths = ["/login"];
+  // Auth / Welcome routes
+  const authPaths = ["/login", "/welcome", "/onboarding"];
   const isAuthPath = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );
 
-  if (!user && isProtectedPath) {
+  if (!hasUserSession && isProtectedPath) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/welcome";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthPath) {
+  if (hasUserSession && isAuthPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

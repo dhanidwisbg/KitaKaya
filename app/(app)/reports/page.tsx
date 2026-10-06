@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
+import { useRouter } from "next/navigation";
 import {
   Download,
   Send,
@@ -15,25 +17,38 @@ import {
   Clock,
   Mail,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export default function MonthlyReportPage() {
   const supabase = createClient();
+  const router = useRouter();
 
   const [period, setPeriod] = useState("mar-2026");
   const [reportFormat, setReportFormat] = useState<"executive" | "full">("executive");
   const [frequency, setFrequency] = useState<"monthly" | "quarterly" | "annual">("monthly");
   const [isSending, setIsSending] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [userEmail, setUserEmail] = useState("dhani@appleid.com");
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("Pengguna");
 
   useEffect(() => {
     async function loadUser() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user?.email) setUserEmail(session.user.email);
+      const userId = getClientUserId();
+      if (userId) {
+        const { data } = await supabase
+          .from("users")
+          .select("full_name, email")
+          .eq("id", userId)
+          .single();
+
+        if (data) {
+          if (data.full_name) setUserName(data.full_name);
+          if (data.email) setUserEmail(data.email);
+        }
+      }
     }
     loadUser();
   }, []);
@@ -47,12 +62,30 @@ export default function MonthlyReportPage() {
     }, 500);
   };
 
-  const handleResendEmail = () => {
+  const handleResendEmail = async () => {
+    if (!userEmail) {
+      toast.error("Email penerima belum ditambahkan di Profil!");
+      router.push("/settings");
+      return;
+    }
+
     setIsSending(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/reports/send", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Gagal mengirim email laporan");
+      }
+
+      toast.success(
+        data.message || `Laporan finansial berhasil dikirim ke ${userEmail}! 📩`
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Gagal mengirim laporan");
+    } finally {
       setIsSending(false);
-      toast.success(`Laporan finansial berhasil dikirim ke ${userEmail} via Resend! 📩`);
-    }, 1200);
+    }
   };
 
   return (
@@ -71,9 +104,19 @@ export default function MonthlyReportPage() {
             Laporan Finansial Bulanan.
           </h1>
           <p className="text-xs sm:text-sm text-on-surface-variant">
-            Dihasilkan otomatis oleh Vercel Cron Job (@react-pdf/renderer) setiap penutupan buku dan
+            Dihasilkan otomatis oleh engine laporan setiap penutupan buku dan
             didistribusikan langsung ke{" "}
-            <span className="font-bold text-primary">{userEmail}</span> via Resend engine.
+            {userEmail ? (
+              <span className="font-bold text-primary">{userEmail}</span>
+            ) : (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:underline bg-amber-50 px-2 py-0.5 rounded-md"
+              >
+                <AlertCircle className="w-3.5 h-3.5" /> Tambahkan Email di Profil
+              </Link>
+            )}{" "}
+            via Resend engine.
           </p>
         </div>
 

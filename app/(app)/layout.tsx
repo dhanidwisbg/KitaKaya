@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import AppHeader from "@/components/layout/AppHeader";
 import AppBottomNav from "@/components/layout/AppBottomNav";
 
@@ -8,23 +8,10 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getCurrentUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.onboarding_completed) {
-    redirect("/onboarding");
+  if (!profile) {
+    redirect("/welcome");
   }
 
   return (

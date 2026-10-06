@@ -3,12 +3,11 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@/lib/types/database.types";
-import { formatCurrency } from "@/lib/utils";
+import { getClientUserId, clearClientUserId } from "@/lib/session-client";
 import {
   User as UserIcon,
   Wallet,
-  Shield,
-  Bell,
+  Mail,
   LogOut,
   Save,
   Loader2,
@@ -23,6 +22,7 @@ export default function SettingsPage() {
 
   const [profile, setProfile] = useState<User | null>(null);
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [monthlyIncome, setMonthlyIncome] = useState("");
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [currency, setCurrency] = useState("IDR");
@@ -31,20 +31,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const userId = getClientUserId();
 
-      if (session?.user) {
-        const { data } = await supabase
+      if (userId) {
+        const { data, error } = await supabase
           .from("users")
           .select("*")
-          .eq("id", session.user.id)
+          .eq("id", userId)
           .single();
 
-        if (data) {
+        if (data && !error) {
           setProfile(data);
           setFullName(data.full_name || "");
+          setEmail(data.email || "");
           setMonthlyIncome(String(data.monthly_income || 0));
           setMonthlyBudget(String(data.monthly_budget || 0));
           setCurrency(data.currency || "IDR");
@@ -60,28 +59,40 @@ export default function SettingsPage() {
     setIsSaving(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
+      if (!userId) {
+        toast.error("Sesi tidak ditemukan, silakan masukkan nama Anda kembali");
+        router.push("/welcome");
+        return;
+      }
 
-      if (!user) throw new Error("Unauthorized");
+      const cleanName = fullName.trim();
+      if (!cleanName) {
+        toast.error("Nama lengkap tidak boleh kosong");
+        setIsSaving(false);
+        return;
+      }
 
       const incomeNum = Number(monthlyIncome.replace(/\D/g, "")) || 0;
       const budgetNum = Number(monthlyBudget.replace(/\D/g, "")) || 0;
+      const cleanEmail = email.trim() || null;
 
       const { error } = await supabase
         .from("users")
         .update({
-          full_name: fullName.trim(),
+          full_name: cleanName,
+          email: cleanEmail,
           monthly_income: incomeNum,
           monthly_budget: budgetNum,
           currency,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", user.id);
+        .eq("id", userId);
 
       if (error) throw error;
+
       toast.success("Pengaturan profil berhasil disimpan! ✨");
+      router.refresh();
     } catch (err: any) {
       toast.error(err.message || "Gagal menyimpan pengaturan");
     } finally {
@@ -90,9 +101,10 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Berhasil keluar");
-    router.push("/login");
+    clearClientUserId();
+    await fetch("/api/auth/session", { method: "DELETE" });
+    toast.success("Sesi telah dihapus");
+    router.push("/welcome");
     router.refresh();
   };
 
@@ -101,15 +113,16 @@ export default function SettingsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-apple-primary">
-          Pengaturan Akun
+          Pengaturan Akun & Profil
         </h1>
         <p className="text-xs text-apple-secondary">
-          Kelola preferensi akun, pemasukan dasar, dan target budget bulananmu.
+          Kelola profil nama, email pengiriman laporan keuangan, dan target anggaran bulananmu.
         </p>
       </div>
 
       {isLoading ? (
         <div className="p-12 text-center text-xs text-apple-secondary">
+          <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-apple-blue" />
           Memuat pengaturan...
         </div>
       ) : (
@@ -123,23 +136,37 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary">Nama Lengkap</label>
+                <label className="text-xs font-semibold text-apple-primary">Nama Kamu</label>
                 <input
                   type="text"
+                  required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Contoh: Dhani"
                   className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary">Email Terdaftar</label>
+                <label className="text-xs font-semibold text-apple-primary flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-apple-blue" />
+                    Email Pengiriman Laporan
+                  </span>
+                  <span className="text-[10px] text-apple-secondary font-normal">
+                    (Untuk terima rekap & PDF)
+                  </span>
+                </label>
                 <input
                   type="email"
-                  disabled
-                  value={profile?.email || ""}
-                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-apple-surface/60 text-apple-secondary cursor-not-allowed"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="namaanda@gmail.com"
+                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-white text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
                 />
+                <p className="text-[11px] text-apple-secondary">
+                  Laporan bulanan atau unduhan PDF akan dikirimkan ke alamat email ini.
+                </p>
               </div>
             </div>
           </div>
@@ -187,15 +214,15 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSignOut}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-apple-red/30 text-apple-red hover:bg-apple-red/10 text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-apple-red/30 text-apple-red hover:bg-apple-red/10 text-xs font-semibold transition-colors cursor-pointer"
             >
-              <LogOut className="w-4 h-4" /> Keluar dari Akun
+              <LogOut className="w-4 h-4" /> Ganti Nama / Reset Sesi
             </button>
 
             <button
               type="submit"
               disabled={isSaving}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-apple-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-apple-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 shadow-sm cursor-pointer"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

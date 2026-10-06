@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Transaction } from "@/lib/types/database.types";
 import { formatCurrency, getCategoryConfig } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
 import {
   PieChart,
   Pie,
@@ -25,15 +26,13 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function loadData() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const userId = getClientUserId();
 
-      if (session?.user) {
+      if (userId) {
         const { data } = await supabase
           .from("transactions")
           .select("id,type,amount,category,description,date")
-          .eq("user_id", session.user.id);
+          .eq("user_id", userId);
 
         if (data) setTransactions(data as any);
       }

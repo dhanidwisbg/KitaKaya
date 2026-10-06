@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SavingsGoal } from "@/lib/types/database.types";
 import { formatCurrency, formatDate, progressPercent } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
 import GoalModal from "@/components/goals/GoalModal";
 import DepositModal from "@/components/goals/DepositModal";
 import {
@@ -28,15 +29,13 @@ export default function GoalsPage() {
 
   const fetchGoals = async () => {
     setIsLoading(true);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const userId = getClientUserId();
 
-    if (session?.user) {
+    if (userId) {
       const { data, error } = await supabase
         .from("savings_goals")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (!error && data) {

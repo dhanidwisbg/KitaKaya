@@ -1,38 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionUserId } from "@/lib/session";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const userId = (await getSessionUserId()) || req.cookies.get("kitakaya_user_id")?.value;
 
-    if (!user) {
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const supabase = await createClient();
     const { messages } = await req.json();
 
     // 1. Fetch user's financial context (Profile, Recent Transactions, Goals)
     const { data: profile } = await supabase
       .from("users")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     const { data: transactions } = await supabase
       .from("transactions")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("date", { ascending: false })
       .limit(30);
 
     const { data: goals } = await supabase
       .from("savings_goals")
       .select("*")
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     const totalIncome = (transactions || [])
       .filter((t) => t.type === "income")

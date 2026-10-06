@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+import { clearClientUserId } from "@/lib/session-client";
+
 interface AppHeaderProps {
   user?: User | null;
 }
@@ -28,12 +30,12 @@ const navLinks = [
 export default function AppHeader({ user }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Berhasil keluar");
-    router.push("/login");
+    clearClientUserId();
+    await fetch("/api/auth/session", { method: "DELETE" });
+    toast.success("Sesi telah keluar");
+    router.push("/welcome");
     router.refresh();
   };
 

@@ -9,6 +9,7 @@ import {
   TransactionCategory,
 } from "@/lib/types/database.types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
+import { getClientUserId } from "@/lib/session-client";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -62,12 +63,10 @@ export default function TransactionModal({
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
 
-      if (!user) {
-        toast.error("Silakan masuk terlebih dahulu");
+      if (!userId) {
+        toast.error("Sesi tidak ditemukan");
         return;
       }
 
@@ -91,13 +90,13 @@ export default function TransactionModal({
             updated_at: new Date().toISOString(),
           })
           .eq("id", transactionToEdit.id)
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
 
         if (error) throw error;
         toast.success("Transaksi berhasil diperbarui");
       } else {
         const { error } = await supabase.from("transactions").insert({
-          user_id: user.id,
+          user_id: userId,
           type,
           category,
           amount: numAmount,

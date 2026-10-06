@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SavingsGoal } from "@/lib/types/database.types";
+import { getClientUserId } from "@/lib/session-client";
 import { X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,12 +44,10 @@ export default function GoalModal({
     setIsLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userId = getClientUserId();
 
-      if (!user) {
-        toast.error("Silakan masuk terlebih dahulu");
+      if (!userId) {
+        toast.error("Sesi tidak ditemukan");
         return;
       }
 
@@ -72,13 +71,13 @@ export default function GoalModal({
             updated_at: new Date().toISOString(),
           })
           .eq("id", goalToEdit.id)
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
 
         if (error) throw error;
         toast.success("Target impian berhasil diubah");
       } else {
         const { error } = await supabase.from("savings_goals").insert({
-          user_id: user.id,
+          user_id: userId,
           title: title.trim(),
           description: description.trim() || null,
           target_amount: numTarget,

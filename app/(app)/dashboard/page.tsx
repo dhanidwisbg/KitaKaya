@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, thisMonthRange, formatDate } from "@/lib/utils";
+import { getSessionUserId } from "@/lib/session";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   TrendingUp,
@@ -29,11 +31,12 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const userId = await getSessionUserId();
+  if (!userId) {
+    redirect("/welcome");
+  }
 
+  const supabase = await createClient();
   const { start, end } = thisMonthRange();
 
   // Parallelkan semua query agar tidak sequential (waterfall)
@@ -45,19 +48,19 @@ export default async function DashboardPage() {
     supabase
       .from("transactions")
       .select("id,type,amount,category,description,date,note")
-      .eq("user_id", user!.id)
+      .eq("user_id", userId)
       .gte("date", start)
       .lte("date", end)
       .order("date", { ascending: false }),
     supabase
       .from("savings_goals")
       .select("id,name,target_amount,current_amount,deadline,icon,color")
-      .eq("user_id", user!.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
       .select("full_name,monthly_income,monthly_budget")
-      .eq("id", user!.id)
+      .eq("id", userId)
       .single(),
   ]);
 

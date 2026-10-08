@@ -20,7 +20,7 @@ export default async function AppLayout({
       <AppHeader user={profile} />
 
       {/* Main Content Area */}
-      <main className="w-full pt-18 sm:pt-20 pb-24 md:pb-12 flex-1">
+      <main className="w-full pt-20 sm:pt-24 pb-24 md:pb-12 flex-1">
         <div className="max-w-[1600px] 2xl:max-w-[1780px] mx-auto px-3.5 sm:px-6 lg:px-8 xl:px-10">
           {children}
         </div>

@@ -445,10 +445,11 @@ export default function TransactionsPage() {
               setSelectedTx(null);
               setIsModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-neutral-800 transition-colors shadow-sm"
+            aria-label="Tambah Transaksi"
+            className="inline-flex items-center justify-center gap-1.5 p-2.5 sm:px-4 sm:py-2.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-neutral-800 transition-colors shadow-sm shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>Tambah</span>
+            <span className="hidden sm:inline">Tambah</span>
           </button>
         </div>
       </div>

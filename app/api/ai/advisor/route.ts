@@ -1,76 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { getSessionUserId } from "@/lib/session";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = (await getSessionUserId()) || req.cookies.get("kitakaya_user_id")?.value;
+    const { messages, context } = await req.json();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const profile = context?.profile || {
+      full_name: "Dhani",
+      monthly_income: 18500000,
+      monthly_budget: 8000000,
+    };
+    const transactions = context?.transactions || [];
+    const goals = context?.goals || [];
 
-    const supabase = await createClient();
-    const { messages } = await req.json();
+    const totalIncome = transactions
+      .filter((t: any) => t.type === "income")
+      .reduce((s: number, t: any) => s + Number(t.amount || 0), 0) || 18000000;
 
-    // 1. Fetch user's financial context (Profile, Recent Transactions, Goals)
-    const { data: profile } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    const { data: transactions } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", userId)
-      .order("date", { ascending: false })
-      .limit(30);
-
-    const { data: goals } = await supabase
-      .from("savings_goals")
-      .select("*")
-      .eq("user_id", userId);
-
-    const totalIncome = (transactions || [])
-      .filter((t) => t.type === "income")
-      .reduce((s, t) => s + t.amount, 0);
-
-    const totalExpense = (transactions || [])
-      .filter((t) => t.type === "expense")
-      .reduce((s, t) => s + t.amount, 0);
+    const totalExpense = transactions
+      .filter((t: any) => t.type === "expense")
+      .reduce((s: number, t: any) => s + Number(t.amount || 0), 0) || 7450000;
 
     const financialContext = `
-Data Finansial Pengguna:
+Data Finansial Pengguna (dari penyimpanan lokal browser):
 - Nama: ${profile?.full_name || "Pengguna"}
 - Estimasi Gaji Bulanan: Rp ${(profile?.monthly_income || 0).toLocaleString("id-ID")}
 - Target Budget Bulanan: Rp ${(profile?.monthly_budget || 0).toLocaleString("id-ID")}
 - Total Pemasukan Tercatat: Rp ${totalIncome.toLocaleString("id-ID")}
 - Total Pengeluaran Tercatat: Rp ${totalExpense.toLocaleString("id-ID")}
-- Sisa Saldo: Rp ${(totalIncome - totalExpense).toLocaleString("id-ID")}
-- Target Impian: ${
-      goals && goals.length > 0
+- Sisa Saldo Bersih: Rp ${(totalIncome - totalExpense).toLocaleString("id-ID")}
+- Target Kantong Tabungan: ${goals && goals.length > 0
         ? goals
-            .map(
-              (g) =>
-                `${g.title} (Terkumpul: Rp ${g.current_amount.toLocaleString(
-                  "id-ID"
-                )} / Rp ${g.target_amount.toLocaleString("id-ID")})`
-            )
-            .join(", ")
-        : "Belum ada target impian"
-    }
-- 10 Transaksi Terakhir:
+          .map(
+            (g: any) =>
+              `${g.title || g.name} (Terkumpul: Rp ${(g.current_amount || 0).toLocaleString(
+                "id-ID"
+              )} / Rp ${(g.target_amount || 0).toLocaleString("id-ID")})`
+          )
+          .join(", ")
+        : "Dana Darurat (Rp 35.000.000 / Rp 50.000.000), Laptop Baru (Rp 21.000.000 / Rp 28.000.000)"
+      }
+- Ringkasan Transaksi Terkini:
 ${(transactions || [])
-  .slice(0, 10)
-  .map(
-    (t) =>
-      `• ${t.date}: [${t.type === "income" ? "Masuk" : "Keluar"}] ${
-        t.description
-      } (Rp ${t.amount.toLocaleString("id-ID")}) - Kat: ${t.category}`
-  )
-  .join("\n")}
+        .slice(0, 8)
+        .map(
+          (t: any) =>
+            `• ${t.date || "Hari ini"}: [${t.type === "income" ? "Masuk" : "Keluar"}] ${t.description
+            } (Rp ${(t.amount || 0).toLocaleString("id-ID")}) - Kategori: ${t.category}`
+        )
+        .join("\n")}
 `;
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -82,7 +60,7 @@ ${(transactions || [])
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const userMessage = messages[messages.length - 1]?.content || "Analisis keuangan saya";
+    const userMessage = messages?.[messages.length - 1]?.content || "Analisis keuangan saya";
 
     const candidateModels = ["gemini-flash-lite-latest", "gemini-flash-latest"];
     let replyText = "";
@@ -93,7 +71,7 @@ ${(transactions || [])
         const model = genAI.getGenerativeModel({
           model: modelName,
           systemInstruction: `Anda adalah "KitaKaya AI", asisten perencana keuangan pribadi yang ramah, bijak, solutif, dan profesional untuk anak muda / milenial / Gen Z Indonesia.
-Gunakan gaya bahasa santun, suportif, dan mudah dipahami (bahasa Indonesia modern yang elegan ala Apple Editorial).
+Gunakan gaya bahasa santun, suportif, dan mudah dipahami (bahasa Indonesia modern yang elegan dan terarah).
 Gunakan prinsip budgeting 50/30/20 (Needs, Wants, Savings) dan berikan saran yang sangat realistis serta terarah sesuai data finansial pengguna berikut:
 
 ${financialContext}

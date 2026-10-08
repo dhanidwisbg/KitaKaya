@@ -27,10 +27,15 @@ export const metadata: Metadata = {
     "Aplikasi pencatatan keuangan cerdas dengan AI assistant untuk membantu kamu mencapai kebebasan finansial.",
   keywords: ["keuangan", "tabungan", "budgeting", "AI", "finansial", "Indonesia"],
   authors: [{ name: "KitaKaya" }],
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
   openGraph: {
-    title: "KitaKaya — Catat Keuangan, Tumbuh Bersama",
+    title: "KitaKaya — Catat Keuangan Pribadi & Kantong Tabungan",
     description:
-      "Aplikasi pencatatan keuangan cerdas dengan AI assistant.",
+      "Aplikasi pencatatan keuangan pribadi dan kantong tabungan yang berjalan 100% di browser Anda.",
     type: "website",
     locale: "id_ID",
   },

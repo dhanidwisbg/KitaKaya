@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { SavingsGoal } from "@/lib/types/database.types";
-import { getClientUserId } from "@/lib/session-client";
-import { X, Loader2 } from "lucide-react";
+import { addStoredGoal, updateStoredGoal, getStoredUser } from "@/lib/storage";
+import CategoryIcon from "@/components/ui/CategoryIcon";
+import { X, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface GoalModalProps {
@@ -15,8 +15,18 @@ interface GoalModalProps {
   onSuccess?: () => void;
 }
 
-const icons = ["🎯", "🏖️", "🚗", "🏠", "💻", "💍", "🛡️", "👶", "🚀", "📱"];
-const colors = ["#30D158", "#0A84FF", "#FF9F0A", "#BF5AF2", "#FF375F", "#64D2FF"];
+const availableIcons = [
+  { name: "Shield", label: "Proteksi / Darurat" },
+  { name: "Laptop", label: "Gadget / Kerja" },
+  { name: "Plane", label: "Liburan / Travel" },
+  { name: "Home", label: "Rumah / Properti" },
+  { name: "Car", label: "Kendaraan" },
+  { name: "Target", label: "Target Finansial" },
+  { name: "PiggyBank", label: "Tabungan Umum" },
+  { name: "Gift", label: "Hadiah / Wishlist" },
+];
+
+const colors = ["#009a3b", "#005ab7", "#1d1d1f", "#d97706", "#7c3aed", "#e11d48"];
 
 export default function GoalModal({
   isOpen,
@@ -25,7 +35,6 @@ export default function GoalModal({
   onSuccess,
 }: GoalModalProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [title, setTitle] = useState(goalToEdit?.title || "");
   const [description, setDescription] = useState(goalToEdit?.description || "");
@@ -33,8 +42,8 @@ export default function GoalModal({
     goalToEdit ? String(goalToEdit.target_amount) : ""
   );
   const [deadline, setDeadline] = useState(goalToEdit?.deadline || "");
-  const [icon, setIcon] = useState(goalToEdit?.icon || "🎯");
-  const [color, setColor] = useState(goalToEdit?.color || "#30D158");
+  const [icon, setIcon] = useState(goalToEdit?.icon || "Shield");
+  const [color, setColor] = useState(goalToEdit?.color || "#009a3b");
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -44,13 +53,7 @@ export default function GoalModal({
     setIsLoading(true);
 
     try {
-      const userId = getClientUserId();
-
-      if (!userId) {
-        toast.error("Sesi tidak ditemukan");
-        return;
-      }
-
+      const user = getStoredUser();
       const numTarget = Number(targetAmount.replace(/\D/g, ""));
       if (!numTarget || numTarget <= 0) {
         toast.error("Target nominal harus lebih dari 0");
@@ -58,26 +61,14 @@ export default function GoalModal({
         return;
       }
 
-      if (goalToEdit) {
-        const { error } = await supabase
-          .from("savings_goals")
-          .update({
-            title: title.trim(),
-            description: description.trim() || null,
-            target_amount: numTarget,
-            deadline: deadline || null,
-            icon,
-            color,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", goalToEdit.id)
-          .eq("user_id", userId);
+      if (!title.trim()) {
+        toast.error("Nama kantong tabungan harus diisi");
+        setIsLoading(false);
+        return;
+      }
 
-        if (error) throw error;
-        toast.success("Target impian berhasil diubah");
-      } else {
-        const { error } = await supabase.from("savings_goals").insert({
-          user_id: userId,
+      if (goalToEdit) {
+        updateStoredGoal(goalToEdit.id, {
           title: title.trim(),
           description: description.trim() || null,
           target_amount: numTarget,
@@ -85,9 +76,20 @@ export default function GoalModal({
           icon,
           color,
         });
-
-        if (error) throw error;
-        toast.success("Target impian baru dibuat! 🎯");
+        toast.success("Target tabungan berhasil diperbarui");
+      } else {
+        addStoredGoal({
+          user_id: user.id,
+          title: title.trim(),
+          description: description.trim() || null,
+          target_amount: numTarget,
+          current_amount: 0,
+          deadline: deadline || null,
+          icon,
+          color,
+          is_completed: false,
+        });
+        toast.success("Kantong tabungan baru berhasil dibuat");
       }
 
       onClose();
@@ -102,91 +104,140 @@ export default function GoalModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-white rounded-3xl border border-apple-subtle shadow-apple-float overflow-hidden animate-scale-up">
+      <div className="w-full max-w-lg bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-apple-subtle">
-          <h2 className="text-base font-semibold text-apple-primary">
-            {goalToEdit ? "Edit Target Impian" : "Target Impian Baru"}
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container-high/60">
+          <div>
+            <h2 className="text-base font-bold text-primary font-headline">
+              {goalToEdit ? "Edit Kantong Tabungan" : "Buat Kantong Tabungan Baru"}
+            </h2>
+            <p className="text-xs text-outline">
+              Target dan alokasi tersimpan aman di browser Anda
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-apple-secondary hover:text-apple-primary hover:bg-apple-surface transition-colors"
+            className="p-2 rounded-full hover:bg-surface-container-low text-outline hover:text-primary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Target Title */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Nama Impian</label>
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Nama Kantong Tabungan
+            </label>
             <input
               type="text"
               required
+              autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="cth. Dana Darurat 6 Bulan, Liburan ke Jepang"
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
+              placeholder="Contoh: Dana Darurat, MacBook Pro, Liburan Jepang"
+              className="w-full h-11 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 border border-surface-container-high transition-all"
             />
           </div>
 
+          {/* Target Nominal */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Target Nominal (IDR)</label>
-            <input
-              type="number"
-              required
-              min="1000"
-              value={targetAmount}
-              onChange={(e) => setTargetAmount(e.target.value)}
-              placeholder="0"
-              className="w-full px-4 py-3 text-lg font-bold text-apple-primary rounded-xl border border-apple-subtle bg-apple-surface/40 focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">
-              Target Tanggal Tercapai (Opsional)
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Target Nominal (Rp)
             </label>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            />
-          </div>
-
-          {/* Icon Picker */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Ikon</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {icons.map((ic) => (
-                <button
-                  key={ic}
-                  type="button"
-                  onClick={() => setIcon(ic)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-base border transition-all ${
-                    icon === ic
-                      ? "border-apple-blue bg-apple-blue/10 scale-110"
-                      : "border-apple-subtle hover:bg-apple-surface"
-                  }`}
-                >
-                  {ic}
-                </button>
-              ))}
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-outline">
+                Rp
+              </span>
+              <input
+                type="text"
+                required
+                value={
+                  targetAmount
+                    ? Number(targetAmount.replace(/\D/g, "")).toLocaleString("id-ID")
+                    : ""
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setTargetAmount(raw);
+                }}
+                placeholder="0"
+                className="w-full h-12 pl-12 pr-4 bg-surface-container-low rounded-2xl text-lg font-bold text-primary focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 border border-surface-container-high transition-all tabular-nums"
+              />
             </div>
           </div>
 
-          {/* Color Picker */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Warna Tag</label>
-            <div className="flex items-center gap-2">
+          {/* Description & Deadline */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Keterangan / Tujuan
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Contoh: Jaring pengaman likuid 6x pengeluaran"
+                className="w-full h-11 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white border border-surface-container-high transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Target Selesai (Deadline)
+              </label>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="w-full h-11 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white border border-surface-container-high transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Icon Selector (Lucide Icons) */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Pilih Ikon Vektor
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {availableIcons.map((item) => {
+                const isSelected = icon === item.name;
+                return (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => setIcon(item.name)}
+                    className={`p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all ${
+                      isSelected
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                    }`}
+                  >
+                    <CategoryIcon name={item.name} size={18} />
+                    <span className="text-[10px] font-semibold truncate w-full text-center">
+                      {item.label.split("/")[0]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Color Selector */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Aksen Warna
+            </label>
+            <div className="flex items-center gap-3">
               {colors.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
                   className={`w-7 h-7 rounded-full transition-transform ${
-                    color === c ? "scale-125 ring-2 ring-offset-2 ring-apple-primary" : ""
+                    color === c ? "scale-125 ring-2 ring-primary ring-offset-2" : "hover:scale-110"
                   }`}
                   style={{ backgroundColor: c }}
                 />
@@ -194,22 +245,21 @@ export default function GoalModal({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 px-4 rounded-xl border border-apple-subtle text-xs font-semibold text-apple-secondary hover:bg-apple-surface transition-colors"
-            >
-              Batal
-            </button>
+          {/* Submit Button */}
+          <div className="pt-2">
             <button
               type="submit"
-              disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-apple-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50"
+              disabled={isLoading || !targetAmount || !title.trim()}
+              className="w-full py-3.5 rounded-2xl bg-primary text-white text-xs font-bold hover:bg-neutral-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
             >
-              {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {goalToEdit ? "Simpan Perubahan" : "Buat Impian"}
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{goalToEdit ? "Simpan Perubahan" : "Buat Kantong Tabungan"}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

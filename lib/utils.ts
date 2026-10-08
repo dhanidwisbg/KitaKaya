@@ -50,38 +50,65 @@ export function getGreeting(): string {
   return "Selamat malam 🌙";
 }
 
+export type LucideIconName =
+  | "Briefcase"
+  | "Laptop"
+  | "TrendingUp"
+  | "Gift"
+  | "Coins"
+  | "UtensilsCrossed"
+  | "Car"
+  | "ShoppingBag"
+  | "Gamepad2"
+  | "HeartPulse"
+  | "GraduationCap"
+  | "Zap"
+  | "Home"
+  | "ShieldCheck"
+  | "PiggyBank"
+  | "Package";
+
 // ---- Category helpers ----
 export const CATEGORY_CONFIG: Record<
   TransactionCategory,
-  { label: string; icon: string; color: string; type: "income" | "expense" | "both" }
+  {
+    label: string;
+    icon: string;
+    lucideIcon: LucideIconName;
+    color: string;
+    type: "income" | "expense" | "both";
+  }
 > = {
   // Income
-  salary:         { label: "Gaji",         icon: "💼", color: "#34C759", type: "income" },
-  freelance:      { label: "Freelance",    icon: "💻", color: "#30D158", type: "income" },
-  investment:     { label: "Investasi",    icon: "📈", color: "#007AFF", type: "income" },
-  gift:           { label: "Hadiah",       icon: "🎁", color: "#FF9500", type: "income" },
-  other_income:   { label: "Lainnya",      icon: "💰", color: "#AF52DE", type: "income" },
+  salary:        { label: "Gaji",         icon: "💼", lucideIcon: "Briefcase",       color: "#009a3b", type: "income" },
+  freelance:     { label: "Freelance",    icon: "💻", lucideIcon: "Laptop",          color: "#005ab7", type: "income" },
+  investment:    { label: "Investasi",    icon: "📈", lucideIcon: "TrendingUp",      color: "#005ab7", type: "income" },
+  gift:          { label: "Hadiah",       icon: "🎁", lucideIcon: "Gift",            color: "#d97706", type: "income" },
+  other_income:  { label: "Lainnya",      icon: "💰", lucideIcon: "Coins",           color: "#1d1d1f", type: "income" },
   // Expense
-  food:           { label: "Makanan",      icon: "🍜", color: "#FF3B30", type: "expense" },
-  transport:      { label: "Transport",    icon: "🚗", color: "#FF9500", type: "expense" },
-  shopping:       { label: "Belanja",      icon: "🛍️", color: "#AF52DE", type: "expense" },
-  entertainment:  { label: "Hiburan",      icon: "🎮", color: "#FF2D55", type: "expense" },
-  health:         { label: "Kesehatan",    icon: "🏥", color: "#34C759", type: "expense" },
-  education:      { label: "Pendidikan",   icon: "📚", color: "#007AFF", type: "expense" },
-  utilities:      { label: "Tagihan",      icon: "⚡", color: "#FFD60A", type: "expense" },
-  rent:           { label: "Sewa/Kos",     icon: "🏠", color: "#8E8E93", type: "expense" },
-  insurance:      { label: "Asuransi",     icon: "🛡️", color: "#636366", type: "expense" },
-  savings:        { label: "Tabungan",     icon: "🏦", color: "#007AFF", type: "both" },
-  other_expense:  { label: "Lainnya",      icon: "📦", color: "#8E8E93", type: "expense" },
+  food:          { label: "Makanan & Minuman", icon: "🍜", lucideIcon: "UtensilsCrossed", color: "#e11d48", type: "expense" },
+  transport:     { label: "Transportasi",      icon: "🚗", lucideIcon: "Car",             color: "#d97706", type: "expense" },
+  shopping:      { label: "Belanja",           icon: "🛍️", lucideIcon: "ShoppingBag",     color: "#7c3aed", type: "expense" },
+  entertainment: { label: "Hiburan & Rekreasi",icon: "🎮", lucideIcon: "Gamepad2",        color: "#db2777", type: "expense" },
+  health:        { label: "Kesehatan",         icon: "🏥", lucideIcon: "HeartPulse",      color: "#059669", type: "expense" },
+  education:     { label: "Pendidikan & Buku", icon: "📚", lucideIcon: "GraduationCap",   color: "#2563eb", type: "expense" },
+  utilities:     { label: "Tagihan & Utilitas",icon: "⚡", lucideIcon: "Zap",             color: "#ca8a04", type: "expense" },
+  rent:          { label: "Sewa / Properti",   icon: "🏠", lucideIcon: "Home",            color: "#4b5563", type: "expense" },
+  insurance:     { label: "Asuransi & Proteksi",icon: "🛡️", lucideIcon: "ShieldCheck",    color: "#475569", type: "expense" },
+  savings:       { label: "Kantong Tabungan",  icon: "🏦", lucideIcon: "PiggyBank",      color: "#005ab7", type: "both" },
+  other_expense: { label: "Lainnya",           icon: "📦", lucideIcon: "Package",        color: "#6b7280", type: "expense" },
 };
 
 export function getCategoryConfig(category: TransactionCategory) {
-  return CATEGORY_CONFIG[category] ?? {
-    label: category,
-    icon: "📦",
-    color: "#8E8E93",
-    type: "expense",
-  };
+  return (
+    CATEGORY_CONFIG[category] ?? {
+      label: category,
+      icon: "📦",
+      lucideIcon: "Package" as LucideIconName,
+      color: "#6b7280",
+      type: "expense" as const,
+    }
+  );
 }
 
 // ---- Number helpers ----

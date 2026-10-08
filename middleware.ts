@@ -1,16 +1,23 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next();
+  const userCookie = request.cookies.get("kitakaya_user_id")?.value;
+
+  // Jika cookie belum ada, buat cookie default agar pengguna langsung bisa memakai dashboard
+  if (!userCookie) {
+    response.cookies.set("kitakaya_user_id", "usr_local_primary", {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+  }
+
+  return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static, _next/image, favicon.ico, public assets
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

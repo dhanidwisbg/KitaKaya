@@ -1,6 +1,5 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { USER_COOKIE_NAME } from "@/lib/session";
-import { generateId } from "@/lib/db/indexeddb";
 
 export async function POST(request: Request) {
   try {
@@ -14,24 +13,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate new user ID
-    const newUserId = generateId();
+    const userId = "usr_local_primary";
 
-    // Create response with session cookie (1 year)
     const response = NextResponse.json({
       success: true,
       user: {
-        id: newUserId,
+        id: userId,
         name: cleanName,
         currency: "IDR",
-        onboarding_completed: true,
       },
     });
 
-    response.cookies.set(USER_COOKIE_NAME, newUserId, {
+    response.cookies.set(USER_COOKIE_NAME, userId, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365, // 1 year
-      httpOnly: false, // Allow browser sync
+      httpOnly: false,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });

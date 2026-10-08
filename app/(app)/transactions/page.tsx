@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Transaction, TransactionType, TransactionCategory } from "@/lib/types/database.types";
 import { formatCurrency, formatDate, getCategoryConfig } from "@/lib/utils";
-import { getClientUserId } from "@/lib/session-client";
 import TransactionModal from "@/components/transactions/TransactionModal";
+import CategoryIcon from "@/components/ui/CategoryIcon";
+import {
+  getStoredTransactions,
+  addStoredTransaction,
+  deleteStoredTransaction,
+  getStoredUser,
+  subscribeStorage,
+} from "@/lib/storage";
 import {
   Sparkles,
   Edit3,
@@ -14,7 +20,6 @@ import {
   Trash2,
   Edit2,
   Check,
-  X,
   Loader2,
   Zap,
   ArrowRight,
@@ -24,8 +29,6 @@ import {
 import { toast } from "sonner";
 
 export default function TransactionsPage() {
-  const supabase = createClient();
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [inputMode, setInputMode] = useState<"ai" | "manual">("ai");
@@ -56,26 +59,19 @@ export default function TransactionsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = () => {
     setIsLoading(true);
-    const userId = getClientUserId();
-
-    if (userId) {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("id,type,amount,category,description,date,note,created_at")
-        .eq("user_id", userId)
-        .order("date", { ascending: false });
-
-      if (!error && data) {
-        setTransactions(data as any);
-      }
-    }
+    const data = getStoredTransactions();
+    setTransactions(data);
     setIsLoading(false);
   };
 
   useEffect(() => {
     fetchTransactions();
+    const unsubscribe = subscribeStorage(() => {
+      fetchTransactions();
+    });
+    return unsubscribe;
   }, []);
 
   const handleAiProcess = async (textToProcess?: string) => {
@@ -96,7 +92,7 @@ export default function TransactionsPage() {
           ...json.data,
           latency: json.latency,
         });
-        toast.success("Transaksi berhasil diekstrak oleh AI! ✨");
+        toast.success("Transaksi berhasil diekstrak secara otomatis!");
       } else {
         throw new Error(json.error || "Gagal mengekstrak transaksi");
       }
@@ -111,27 +107,18 @@ export default function TransactionsPage() {
     if (!parsedData) return;
 
     try {
-      const userId = getClientUserId();
-
-      if (!userId) {
-        toast.error("Sesi tidak ditemukan");
-        return;
-      }
-
-      const { error } = await supabase.from("transactions").insert({
-        user_id: userId,
+      const user = getStoredUser();
+      addStoredTransaction({
+        user_id: user.id,
         type: parsedData.type,
         category: parsedData.category,
         amount: parsedData.amount,
         description: parsedData.description,
         note: parsedData.note || null,
         date: parsedData.date || new Date().toISOString().split("T")[0],
-        is_ai_generated: true,
       });
 
-      if (error) throw error;
-
-      toast.success("Transaksi tersimpan ke buku kas! 🚀");
+      toast.success("Transaksi tersimpan di buku kas lokal!");
       setParsedData(null);
       setPromptText("");
       fetchTransactions();
@@ -143,27 +130,22 @@ export default function TransactionsPage() {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const userId = getClientUserId();
-
-      if (!userId) return;
-
+      const user = getStoredUser();
       const numAmount = Number(manualAmount.replace(/\D/g, ""));
       if (!numAmount || numAmount <= 0) {
         toast.error("Nominal harus lebih dari 0");
         return;
       }
 
-      const { error } = await supabase.from("transactions").insert({
-        user_id: userId,
+      addStoredTransaction({
+        user_id: user.id,
         type: manualType,
         category: manualCategory,
         amount: numAmount,
         description: manualTitle.trim(),
         date: manualDate,
-        is_ai_generated: false,
+        note: null,
       });
-
-      if (error) throw error;
 
       toast.success("Transaksi manual berhasil dicatat!");
       setManualTitle("");
@@ -174,16 +156,11 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) return;
-
-    const { error } = await supabase.from("transactions").delete().eq("id", id);
-    if (error) {
-      toast.error("Gagal menghapus transaksi");
-    } else {
-      toast.success("Transaksi berhasil dihapus");
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
-    }
+    deleteStoredTransaction(id);
+    toast.success("Transaksi berhasil dihapus");
+    fetchTransactions();
   };
 
   const filtered = transactions.filter((t) => {
@@ -207,15 +184,14 @@ export default function TransactionsPage() {
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-surface-container-lowest shadow-sm mb-3 border border-surface-container-high/50">
               <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
               <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                Active Natural Language AI
+                Penyimpanan Lokal Browser • Privat
               </span>
             </div>
             <h1 className="font-headline text-3xl sm:text-4xl font-bold text-primary tracking-tight">
-              Transaksi & Pencatatan Cerdas.
+              Buku Kas & Transaksi.
             </h1>
             <p className="text-xs sm:text-sm text-on-surface-variant mt-1.5">
-              AI Gemini mengubah kalimat alami Anda menjadi transaksi terstruktur seketika dengan
-              kategori dan nominal otomatis.
+              Catat pemasukan dan pengeluaran secara terstruktur dengan asisten cepat atau form manual.
             </p>
           </div>
 
@@ -230,7 +206,7 @@ export default function TransactionsPage() {
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Input Natural AI</span>
+              <span>Input Cepat Natural</span>
             </button>
             <button
               onClick={() => setInputMode("manual")}
@@ -241,35 +217,39 @@ export default function TransactionsPage() {
               }`}
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Input Manual</span>
+              <span>Input Form</span>
             </button>
           </div>
         </div>
 
         {/* AI Omnibar */}
         {inputMode === "ai" ? (
-          <div className="mt-6">
-            <div className="bg-surface-container-lowest rounded-3xl p-5 sm:p-6 border border-surface-container-high/70 shadow-sm space-y-4">
-              <div className="relative flex items-center">
-                <Sparkles className="w-5 h-5 absolute left-4 text-secondary pointer-events-none" />
+          <div className="mt-8 relative z-10 space-y-4">
+            <div className="relative bg-surface-container-lowest rounded-2xl p-2 border border-surface-container-high/80 shadow-[0_4px_20px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <div className="flex items-center gap-3 px-3">
+                <Sparkles className="w-5 h-5 text-primary shrink-0" />
                 <input
                   type="text"
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAiProcess();
+                    if (e.key === "Enter" && !isAiProcessing) {
+                      handleAiProcess();
+                    }
                   }}
-                  placeholder='Contoh: "Beli kopi 25rb pakai Gopay" atau "Terima freelance 3.5jt Jenius"'
-                  className="w-full pl-12 pr-28 py-3.5 bg-surface-container-low text-primary text-xs sm:text-sm rounded-2xl border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                  placeholder='Ketik natural: "Kopi Kenangan 28rb", "Gaji proyek 5jt", "Bensin 150rb"...'
+                  className="w-full py-2.5 text-xs sm:text-sm font-medium bg-transparent border-0 focus:outline-none text-primary placeholder:text-outline"
                 />
                 <button
-                  type="button"
                   onClick={() => handleAiProcess()}
-                  disabled={!promptText.trim() || isAiProcessing}
-                  className="absolute right-2 bg-primary hover:bg-neutral-800 text-white text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-1.5 transition-transform active:scale-95 shadow-sm disabled:opacity-40"
+                  disabled={isAiProcessing || !promptText.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-neutral-800 disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-sm shrink-0"
                 >
                   {isAiProcessing ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Memproses...</span>
+                    </>
                   ) : (
                     <>
                       <span>Proses</span>
@@ -279,88 +259,51 @@ export default function TransactionsPage() {
                 </button>
               </div>
 
-              {/* Quick Example Chips */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-outline uppercase tracking-wider">
-                    CONTOH CEPAT:
-                  </span>
-                  {[
-                    "Beli bensin Shell 200rb BCA",
-                    "Gaji bulanan 12jt masuk BCA",
-                    "Langganan Netflix 186rb",
-                  ].map((sample, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        setPromptText(sample);
-                        handleAiProcess(sample);
-                      }}
-                      className="px-3 py-1 bg-surface-container-low hover:bg-surface-container-high rounded-full text-primary text-[11px] font-medium border border-surface-container-high transition-colors"
-                    >
-                      &ldquo;{sample}&rdquo;
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-1 text-[10px] text-outline">
-                  <ShieldCheck className="w-3.5 h-3.5 text-tertiary-on-container" />
-                  <span>Google Gemini 1.5 Flash • Terenkripsi</span>
-                </div>
-              </div>
-
-              {/* Live AI Structured Entity Card */}
+              {/* Parsed Result Confirmation Card */}
               {parsedData && (
-                <div className="mt-4 p-4 rounded-2xl bg-surface-container border border-surface-container-high flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-scale-up">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-tertiary-container text-tertiary-on-container flex items-center justify-center font-bold flex-shrink-0">
-                      <Zap className="w-5 h-5" />
+                <div className="mt-3 p-4 rounded-xl bg-surface-container-low border border-surface-container-high/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-scale-up">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-surface-container-lowest flex items-center justify-center text-primary shadow-sm">
+                      <CategoryIcon category={parsedData.category} size={18} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <span className="font-bold text-tertiary-on-container uppercase tracking-wider">
-                          AI Structured Entity
-                        </span>
-                        <span className="w-1 h-1 rounded-full bg-outline" />
-                        <span className="text-outline">Latency: {parsedData.latency}</span>
-                      </div>
-                      <div className="font-headline text-base font-bold text-primary mt-0.5">
-                        {parsedData.description}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className="text-[11px] font-medium text-on-surface-variant bg-surface-container-lowest px-2.5 py-0.5 rounded-md border border-surface-container-high">
-                          Kategori: {getCategoryConfig(parsedData.category).label}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-primary">
+                          {parsedData.description}
                         </span>
                         <span
-                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             parsedData.type === "income"
-                              ? "text-tertiary-on-container bg-tertiary-container/60"
-                              : "text-apple-red bg-apple-red/10"
+                              ? "bg-tertiary-container text-tertiary-on-container"
+                              : "bg-apple-red/10 text-apple-red"
                           }`}
                         >
-                          {parsedData.type === "income" ? "+" : "-"}
-                          {formatCurrency(parsedData.amount)}
+                          {parsedData.type === "income" ? "+ Pemasukan" : "- Pengeluaran"}
                         </span>
+                      </div>
+                      <div className="text-[11px] text-outline mt-0.5">
+                        <span>Rp {parsedData.amount.toLocaleString("id-ID")}</span>
+                        <span> • </span>
+                        <span>{getCategoryConfig(parsedData.category).label}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end md:self-center">
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button
                       type="button"
                       onClick={() => setParsedData(null)}
-                      className="px-4 py-2 text-xs font-semibold text-outline hover:text-primary transition-colors"
+                      className="px-3 py-1.5 text-xs font-semibold text-outline hover:text-primary transition-colors"
                     >
                       Batal
                     </button>
                     <button
                       type="button"
                       onClick={commitAiTransaction}
-                      className="px-5 py-2 text-xs font-bold bg-primary text-white rounded-full hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-sm"
+                      className="px-4 py-1.5 text-xs font-bold bg-primary text-white rounded-full hover:bg-neutral-800 transition-colors flex items-center gap-1.5 shadow-sm"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>Konfirmasi Simpan</span>
+                      <span>Simpan</span>
                     </button>
                   </div>
                 </div>
@@ -384,7 +327,7 @@ export default function TransactionsPage() {
                   value={manualTitle}
                   onChange={(e) => setManualTitle(e.target.value)}
                   placeholder="Deskripsi transaksi..."
-                  className="w-full px-4 py-2.5 bg-surface-container-low rounded-xl text-xs text-primary border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-secondary/20"
+                  className="w-full px-4 py-2.5 bg-surface-container-low rounded-xl text-xs text-primary border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
@@ -399,25 +342,27 @@ export default function TransactionsPage() {
                   value={manualAmount}
                   onChange={(e) => setManualAmount(e.target.value)}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-surface-container-low rounded-xl text-xs text-primary font-bold border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-secondary/20"
+                  className="w-full px-4 py-2.5 bg-surface-container-low rounded-xl text-xs text-primary font-bold border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-outline uppercase tracking-wider block">
-                  Tipe & Kategori
+                  Kategori
                 </label>
                 <select
                   value={manualCategory}
                   onChange={(e) => setManualCategory(e.target.value as TransactionCategory)}
                   className="w-full px-4 py-2.5 bg-surface-container-low rounded-xl text-xs text-primary border border-surface-container-high focus:outline-none focus:bg-white"
                 >
-                  <option value="food">🍜 Makanan & Minuman</option>
-                  <option value="transport">🚗 Transportasi</option>
-                  <option value="shopping">🛍️ Belanja</option>
-                  <option value="utilities">⚡ Tagihan & Utilitas</option>
-                  <option value="salary">💼 Gaji & Pemasukan</option>
-                  <option value="freelance">💻 Freelance</option>
+                  <option value="food">Makanan & Minuman</option>
+                  <option value="transport">Transportasi</option>
+                  <option value="shopping">Belanja</option>
+                  <option value="utilities">Tagihan & Utilitas</option>
+                  <option value="salary">Gaji & Pemasukan</option>
+                  <option value="freelance">Freelance</option>
+                  <option value="health">Kesehatan</option>
+                  <option value="other_expense">Lainnya</option>
                 </select>
               </div>
 
@@ -456,41 +401,54 @@ export default function TransactionsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari transaksi berdasarkan nama atau catatan..."
-            className="w-full pl-11 pr-4 py-2.5 text-xs rounded-full border border-surface-container-high bg-white text-primary focus:outline-none focus:ring-2 focus:ring-secondary/20 transition-all shadow-sm"
+            className="w-full pl-11 pr-4 py-2.5 text-xs rounded-full border border-surface-container-high bg-white text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
           />
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 p-1 bg-surface-container-low rounded-full border border-surface-container-high w-full sm:w-auto">
+        {/* Filter Pills and Add Button */}
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex items-center gap-1.5 p-1 bg-surface-container-low rounded-full border border-surface-container-high">
+            <button
+              onClick={() => setFilterType("all")}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
+                filterType === "all"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-on-surface-variant hover:text-primary"
+              }`}
+            >
+              Semua
+            </button>
+            <button
+              onClick={() => setFilterType("expense")}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
+                filterType === "expense"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-on-surface-variant hover:text-primary"
+              }`}
+            >
+              Pengeluaran
+            </button>
+            <button
+              onClick={() => setFilterType("income")}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
+                filterType === "income"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-on-surface-variant hover:text-primary"
+              }`}
+            >
+              Pemasukan
+            </button>
+          </div>
+
           <button
-            onClick={() => setFilterType("all")}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
-              filterType === "all"
-                ? "bg-primary text-white shadow-sm"
-                : "text-on-surface-variant hover:text-primary"
-            }`}
+            onClick={() => {
+              setSelectedTx(null);
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-primary text-white text-xs font-bold hover:bg-neutral-800 transition-colors shadow-sm"
           >
-            Semua
-          </button>
-          <button
-            onClick={() => setFilterType("expense")}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
-              filterType === "expense"
-                ? "bg-primary text-white shadow-sm"
-                : "text-on-surface-variant hover:text-primary"
-            }`}
-          >
-            Pengeluaran
-          </button>
-          <button
-            onClick={() => setFilterType("income")}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
-              filterType === "income"
-                ? "bg-primary text-white shadow-sm"
-                : "text-on-surface-variant hover:text-primary"
-            }`}
-          >
-            Pemasukan
+            <Plus className="w-4 h-4" />
+            <span>Tambah</span>
           </button>
         </div>
       </div>
@@ -505,7 +463,7 @@ export default function TransactionsPage() {
           <div className="p-16 text-center space-y-2">
             <p className="text-sm font-bold text-primary">Belum ada transaksi</p>
             <p className="text-xs text-outline">
-              Gunakan Omnibar AI di atas untuk mencatat pengeluaran atau pemasukan pertamamu.
+              Gunakan pencatat cepat di atas untuk mencatat pengeluaran atau pemasukan pertamamu.
             </p>
           </div>
         ) : (
@@ -520,22 +478,14 @@ export default function TransactionsPage() {
                   className="p-4 sm:px-6 flex items-center justify-between hover:bg-surface-container-low/40 transition-colors group"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-lg flex-shrink-0"
-                      style={{ backgroundColor: `${conf.color}15` }}
-                    >
-                      {conf.icon}
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-surface-container-low border border-surface-container-high/60 text-primary flex-shrink-0">
+                      <CategoryIcon category={tx.category} size={18} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-xs font-bold text-primary truncate">
                           {tx.description}
                         </p>
-                        {tx.is_ai_generated && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-secondary-fixed text-secondary">
-                            AI
-                          </span>
-                        )}
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-outline mt-0.5">
                         <span>{conf.label}</span>

@@ -2,15 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import {
   Transaction,
   TransactionType,
   TransactionCategory,
 } from "@/lib/types/database.types";
 import { CATEGORY_CONFIG } from "@/lib/utils";
-import { getClientUserId } from "@/lib/session-client";
-import { X, Loader2 } from "lucide-react";
+import {
+  addStoredTransaction,
+  updateStoredTransaction,
+  getStoredUser,
+} from "@/lib/storage";
+import CategoryIcon from "@/components/ui/CategoryIcon";
+import { X, Loader2, Plus, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface TransactionModalProps {
@@ -22,7 +26,7 @@ interface TransactionModalProps {
 
 const categories = Object.entries(CATEGORY_CONFIG) as [
   TransactionCategory,
-  { label: string; icon: string; color: string; type: "income" | "expense" | "both" }
+  (typeof CATEGORY_CONFIG)[TransactionCategory]
 ][];
 
 export default function TransactionModal({
@@ -32,7 +36,6 @@ export default function TransactionModal({
   onSuccess,
 }: TransactionModalProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [type, setType] = useState<TransactionType>(
     transactionToEdit?.type || "expense"
@@ -63,13 +66,7 @@ export default function TransactionModal({
     setIsLoading(true);
 
     try {
-      const userId = getClientUserId();
-
-      if (!userId) {
-        toast.error("Sesi tidak ditemukan");
-        return;
-      }
-
+      const user = getStoredUser();
       const numAmount = Number(amount.replace(/\D/g, ""));
       if (!numAmount || numAmount <= 0) {
         toast.error("Nominal harus lebih dari 0");
@@ -77,26 +74,14 @@ export default function TransactionModal({
         return;
       }
 
-      if (transactionToEdit) {
-        const { error } = await supabase
-          .from("transactions")
-          .update({
-            type,
-            category,
-            amount: numAmount,
-            description: description.trim(),
-            note: note.trim() || null,
-            date,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", transactionToEdit.id)
-          .eq("user_id", userId);
+      if (!description.trim()) {
+        toast.error("Deskripsi transaksi harus diisi");
+        setIsLoading(false);
+        return;
+      }
 
-        if (error) throw error;
-        toast.success("Transaksi berhasil diperbarui");
-      } else {
-        const { error } = await supabase.from("transactions").insert({
-          user_id: userId,
+      if (transactionToEdit) {
+        updateStoredTransaction(transactionToEdit.id, {
           type,
           category,
           amount: numAmount,
@@ -104,9 +89,18 @@ export default function TransactionModal({
           note: note.trim() || null,
           date,
         });
-
-        if (error) throw error;
-        toast.success("Transaksi berhasil dicatat ✨");
+        toast.success("Transaksi berhasil diperbarui");
+      } else {
+        addStoredTransaction({
+          user_id: user.id,
+          type,
+          category,
+          amount: numAmount,
+          description: description.trim(),
+          note: note.trim() || null,
+          date,
+        });
+        toast.success("Transaksi berhasil dicatat");
       }
 
       onClose();
@@ -121,37 +115,42 @@ export default function TransactionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-white rounded-3xl border border-apple-subtle shadow-apple-float overflow-hidden animate-scale-up">
+      <div className="w-full max-w-lg bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-apple-subtle">
-          <h2 className="text-base font-semibold text-apple-primary">
-            {transactionToEdit ? "Edit Transaksi" : "Tambah Transaksi Baru"}
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container-high/60">
+          <div>
+            <h2 className="text-base font-bold text-primary font-headline">
+              {transactionToEdit ? "Edit Catatan Transaksi" : "Tambah Transaksi Baru"}
+            </h2>
+            <p className="text-xs text-outline">
+              Tersimpan langsung di memori browser lokal Anda
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-apple-secondary hover:text-apple-primary hover:bg-apple-surface transition-colors"
+            className="p-2 rounded-full hover:bg-surface-container-low text-outline hover:text-primary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Type Toggle */}
-          <div className="grid grid-cols-2 p-1 bg-apple-surface rounded-xl border border-apple-subtle">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Tipe: Pemasukan / Pengeluaran Pill Switcher */}
+          <div className="flex bg-surface-container-low p-1 rounded-2xl border border-surface-container-high/50">
             <button
               type="button"
               onClick={() => {
                 setType("expense");
                 setCategory("food");
               }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                 type === "expense"
                   ? "bg-white text-apple-red shadow-sm"
-                  : "text-apple-secondary hover:text-apple-primary"
+                  : "text-outline hover:text-primary"
               }`}
             >
-              Pengeluaran
+              - Pengeluaran
             </button>
             <button
               type="button"
@@ -159,99 +158,136 @@ export default function TransactionModal({
                 setType("income");
                 setCategory("salary");
               }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                 type === "income"
-                  ? "bg-white text-apple-green shadow-sm"
-                  : "text-apple-secondary hover:text-apple-primary"
+                  ? "bg-white text-emerald-600 shadow-sm"
+                  : "text-outline hover:text-primary"
               }`}
             >
-              Pemasukan
+              + Pemasukan
             </button>
           </div>
 
-          {/* Amount */}
+          {/* Nominal Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Nominal (IDR)</label>
-            <input
-              type="number"
-              required
-              min="1"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="w-full px-4 py-3 text-lg font-bold text-apple-primary rounded-xl border border-apple-subtle bg-apple-surface/40 focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            />
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Nominal (Rp)
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-outline">
+                Rp
+              </span>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={
+                  amount ? Number(amount.replace(/\D/g, "")).toLocaleString("id-ID") : ""
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setAmount(raw);
+                }}
+                placeholder="0"
+                className="w-full h-12 pl-12 pr-4 bg-surface-container-low rounded-2xl text-lg font-bold text-primary focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 border border-surface-container-high transition-all tabular-nums"
+              />
+            </div>
           </div>
 
-          {/* Description */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Keterangan</label>
-            <input
-              type="text"
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="cth. Makan Siang Padang, Kopi Kenangan"
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            />
+          {/* Deskripsi & Kategori Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Deskripsi
+              </label>
+              <input
+                type="text"
+                required
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Contoh: Kopi Kenangan"
+                className="w-full h-11 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 border border-surface-container-high transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Tanggal
+              </label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full h-11 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 border border-surface-container-high transition-all"
+              />
+            </div>
           </div>
 
-          {/* Category Selection */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Kategori</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as TransactionCategory)}
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            >
-              {filteredCategories.map(([key, item]) => (
-                <option key={key} value={key}>
-                  {item.icon} {item.label}
-                </option>
-              ))}
-            </select>
+          {/* Kategori Selector dengan Lucide Icon */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Kategori
+            </label>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto p-1 border border-surface-container-high/40 rounded-2xl bg-surface-container-lowest">
+              {filteredCategories.map(([key, conf]) => {
+                const isSelected = category === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setCategory(key)}
+                    className={`flex flex-col items-center justify-center p-2 rounded-xl text-center transition-all ${
+                      isSelected
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-surface-container-low/70 text-on-surface-variant hover:bg-surface-container-high/60"
+                    }`}
+                  >
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center mb-1 ${
+                        isSelected ? "text-white" : "text-primary"
+                      }`}
+                    >
+                      <CategoryIcon category={key} size={15} />
+                    </div>
+                    <span className="text-[10px] font-semibold truncate w-full">
+                      {conf.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Date */}
+          {/* Catatan Tambahan (Opsional) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Tanggal</label>
-            <input
-              type="date"
-              required
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-2.5 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
-            />
-          </div>
-
-          {/* Note */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-apple-primary">Catatan (Opsional)</label>
+            <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+              Catatan / Akun (Opsional)
+            </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="cth. Dibayarin sebagian oleh kantor"
-              className="w-full px-4 py-2 text-sm rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all"
+              placeholder="Contoh: QRIS BCA, Jenius, Cash"
+              className="w-full h-10 px-4 bg-surface-container-low rounded-2xl text-xs font-medium text-primary focus:outline-none focus:bg-white border border-surface-container-high transition-all"
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 px-4 rounded-xl border border-apple-subtle text-xs font-semibold text-apple-secondary hover:bg-apple-surface transition-colors"
-            >
-              Batal
-            </button>
+          {/* Submit Button */}
+          <div className="pt-2">
             <button
               type="submit"
-              disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-apple-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50"
+              disabled={isLoading || !amount || !description.trim()}
+              className="w-full py-3.5 rounded-2xl bg-primary text-white text-xs font-bold hover:bg-neutral-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
             >
-              {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {transactionToEdit ? "Simpan Perubahan" : "Catat Transaksi"}
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{transactionToEdit ? "Simpan Perubahan" : "Catat Transaksi"}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

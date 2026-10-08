@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect, useRef } from "react";
 import { User } from "@/lib/types/database.types";
-import { getClientUserId, clearClientUserId } from "@/lib/session-client";
+import {
+  getStoredUser,
+  saveStoredUser,
+  clearUserSession,
+  exportAllDataToJson,
+  importAllDataFromJson,
+  resetAllStorageToDefault,
+} from "@/lib/storage";
 import {
   User as UserIcon,
   Wallet,
@@ -12,15 +18,19 @@ import {
   Save,
   Loader2,
   CheckCircle2,
+  Download,
+  Upload,
+  RotateCcw,
+  ShieldCheck,
+  HardDrive,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
-  const supabase = createClient();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [profile, setProfile] = useState<User | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [monthlyIncome, setMonthlyIncome] = useState("");
@@ -30,210 +40,312 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    async function fetchProfile() {
-      const userId = getClientUserId();
-
-      if (userId) {
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", userId)
-          .single();
-
-        if (data && !error) {
-          setProfile(data);
-          setFullName(data.full_name || "");
-          setEmail(data.email || "");
-          setMonthlyIncome(String(data.monthly_income || 0));
-          setMonthlyBudget(String(data.monthly_budget || 0));
-          setCurrency(data.currency || "IDR");
-        }
-      }
-      setIsLoading(false);
+    const user = getStoredUser();
+    if (user) {
+      setFullName(user.full_name || "");
+      setEmail(user.email || "");
+      setMonthlyIncome(String(user.monthly_income || 0));
+      setMonthlyBudget(String(user.monthly_budget || 0));
+      setCurrency(user.currency || "IDR");
     }
-    fetchProfile();
+    setIsLoading(false);
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
     try {
-      const userId = getClientUserId();
-      if (!userId) {
-        toast.error("Sesi tidak ditemukan, silakan masukkan nama Anda kembali");
-        router.push("/welcome");
-        return;
-      }
+      saveStoredUser({
+        full_name: fullName.trim(),
+        email: email.trim() || null,
+        monthly_income: Number(monthlyIncome.replace(/\D/g, "")),
+        monthly_budget: Number(monthlyBudget.replace(/\D/g, "")),
+        currency,
+      });
 
-      const cleanName = fullName.trim();
-      if (!cleanName) {
-        toast.error("Nama lengkap tidak boleh kosong");
-        setIsSaving(false);
-        return;
-      }
-
-      const incomeNum = Number(monthlyIncome.replace(/\D/g, "")) || 0;
-      const budgetNum = Number(monthlyBudget.replace(/\D/g, "")) || 0;
-      const cleanEmail = email.trim() || null;
-
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: cleanName,
-          email: cleanEmail,
-          monthly_income: incomeNum,
-          monthly_budget: budgetNum,
-          currency,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
-
-      if (error) throw error;
-
-      toast.success("Pengaturan profil berhasil disimpan! ✨");
-      router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menyimpan pengaturan");
+      toast.success("Pengaturan profil berhasil disimpan di peramban!");
+    } catch {
+      toast.error("Gagal menyimpan profil");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSignOut = async () => {
-    clearClientUserId();
+  const handleExport = () => {
+    try {
+      const json = exportAllDataToJson();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kitakaya_backup_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("File cadangan JSON berhasil diunduh 📁");
+    } catch {
+      toast.error("Gagal mengekspor data");
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const ok = importAllDataFromJson(content);
+      if (ok) {
+        toast.success("Data berhasil dipulihkan dari cadangan JSON! 🎉");
+        // Reload settings fields
+        const user = getStoredUser();
+        setFullName(user.full_name || "");
+        setEmail(user.email || "");
+        setMonthlyIncome(String(user.monthly_income || 0));
+        setMonthlyBudget(String(user.monthly_budget || 0));
+      } else {
+        toast.error("Format file cadangan tidak valid");
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleResetData = () => {
+    if (
+      !confirm(
+        "Hapus semua data? Seluruh transaksi, kantong tabungan, dan profil akan dihapus. Kamu akan diminta mengisi ulang preferensi awal."
+      )
+    )
+      return;
+
+    resetAllStorageToDefault();
+    toast.success("Data berhasil dihapus. Silakan isi ulang preferensimu.");
+    router.push("/dashboard");
+    router.refresh();
+  };
+
+  const handleLogout = async () => {
+    clearUserSession();
     await fetch("/api/auth/session", { method: "DELETE" });
-    toast.success("Sesi telah dihapus");
+    toast.success("Sesi telah keluar");
     router.push("/welcome");
     router.refresh();
   };
 
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center text-xs text-outline">
+        Memuat preferensi pengguna...
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-8 animate-fade-in pb-16 max-w-4xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-apple-primary">
-          Pengaturan Akun & Profil
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary font-headline">
+          Pengaturan & Data.
         </h1>
-        <p className="text-xs text-apple-secondary">
-          Kelola profil nama, email pengiriman laporan keuangan, dan target anggaran bulananmu.
+        <p className="text-xs sm:text-sm text-outline mt-1">
+          Kelola profil finansial dan kelola cadangan data langsung di browser Anda.
         </p>
       </div>
 
-      {isLoading ? (
-        <div className="p-12 text-center text-xs text-apple-secondary">
-          <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-apple-blue" />
-          Memuat pengaturan...
+      {/* Profile Form */}
+      <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 sm:p-8 shadow-apple-card space-y-6">
+        <div className="flex items-center gap-3 pb-4 border-b border-surface-container-high/60">
+          <div className="w-10 h-10 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary border border-surface-container-high">
+            <UserIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-primary font-headline">Profil Finansial</h2>
+            <p className="text-xs text-outline">Informasi target dan alokasi anggaran bulanan</p>
+          </div>
         </div>
-      ) : (
-        <form onSubmit={handleSave} className="space-y-6">
-          {/* Profile Card */}
-          <div className="bg-white rounded-3xl border border-apple-subtle p-6 shadow-apple-card space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-apple-subtle">
-              <UserIcon className="w-4 h-4 text-apple-blue" />
-              <h2 className="text-sm font-semibold text-apple-primary">Informasi Pribadi</h2>
+
+        <form onSubmit={handleSave} className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Nama Pengguna
+              </label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Dhani"
+                className="w-full h-11 px-4 text-xs font-medium bg-surface-container-low rounded-2xl border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 text-primary transition-all"
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary">Nama Kamu</label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Contoh: Dhani"
-                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-apple-blue" />
-                    Email Pengiriman Laporan
-                  </span>
-                  <span className="text-[10px] text-apple-secondary font-normal">
-                    (Untuk terima rekap & PDF)
-                  </span>
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="namaanda@gmail.com"
-                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-white text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
-                />
-                <p className="text-[11px] text-apple-secondary">
-                  Laporan bulanan atau unduhan PDF akan dikirimkan ke alamat email ini.
-                </p>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Alamat Email (Untuk Laporan PDF)
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nama@email.com"
+                className="w-full h-11 px-4 text-xs font-medium bg-surface-container-low rounded-2xl border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 text-primary transition-all"
+              />
             </div>
           </div>
 
-          {/* Financial Target Card */}
-          <div className="bg-white rounded-3xl border border-apple-subtle p-6 shadow-apple-card space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-apple-subtle">
-              <Wallet className="w-4 h-4 text-apple-green" />
-              <h2 className="text-sm font-semibold text-apple-primary">
-                Pemasukan & Batas Budget
-              </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Estimasi Gaji / Pemasukan Bulanan (Rp)
+              </label>
+              <input
+                type="text"
+                value={
+                  monthlyIncome
+                    ? Number(monthlyIncome.replace(/\D/g, "")).toLocaleString("id-ID")
+                    : ""
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setMonthlyIncome(raw);
+                }}
+                placeholder="0"
+                className="w-full h-11 px-4 text-xs font-bold bg-surface-container-low rounded-2xl border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 text-primary transition-all tabular-nums"
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary">
-                  Estimasi Pemasukan Bulanan (IDR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={monthlyIncome}
-                  onChange={(e) => setMonthlyIncome(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-apple-primary">
-                  Target Maksimal Pengeluaran (IDR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={monthlyBudget}
-                  onChange={(e) => setMonthlyBudget(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs rounded-xl border border-apple-subtle bg-apple-surface/40 text-apple-primary focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
+                Target Pagu Pengeluaran Bulanan (Rp)
+              </label>
+              <input
+                type="text"
+                value={
+                  monthlyBudget
+                    ? Number(monthlyBudget.replace(/\D/g, "")).toLocaleString("id-ID")
+                    : ""
+                }
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, "");
+                  setMonthlyBudget(raw);
+                }}
+                placeholder="0"
+                className="w-full h-11 px-4 text-xs font-bold bg-surface-container-low rounded-2xl border border-surface-container-high focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary/20 text-primary transition-all tabular-nums"
+              />
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-2">
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-apple-red/30 text-apple-red hover:bg-apple-red/10 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" /> Ganti Nama / Reset Sesi
-            </button>
-
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
               disabled={isSaving}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-apple-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-50 shadow-sm cursor-pointer"
+              className="px-6 py-3 rounded-full bg-primary text-white text-xs font-bold hover:bg-neutral-800 active:scale-[0.99] transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Save className="w-4 h-4" />
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Perubahan</span>
+                </>
               )}
-              Simpan Pengaturan
             </button>
           </div>
         </form>
-      )}
+      </div>
+
+      {/* Data Management Section (Browser Storage Control) */}
+      <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 sm:p-8 shadow-apple-card space-y-5">
+        <div className="flex items-center gap-3 pb-4 border-b border-surface-container-high/60">
+          <div className="w-10 h-10 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary border border-surface-container-high">
+            <HardDrive className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-primary font-headline">Manajemen Data Browser</h2>
+            <p className="text-xs text-outline">
+              Data Anda 100% tersimpan di browser ini. Cadangkan atau pulihkan kapan saja.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            onClick={handleExport}
+            className="p-4 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-left border border-surface-container-high/60 transition-colors group flex flex-col justify-between"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-primary mb-3 shadow-sm group-hover:scale-105 transition-transform">
+              <Download className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-primary">Ekspor ke JSON</p>
+              <p className="text-[11px] text-outline mt-0.5">
+                Unduh seluruh riwayat transaksi & kantong tabungan.
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-4 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-left border border-surface-container-high/60 transition-colors group flex flex-col justify-between"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-primary mb-3 shadow-sm group-hover:scale-105 transition-transform">
+              <Upload className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-primary">Impor dari JSON</p>
+              <p className="text-[11px] text-outline mt-0.5">
+                Pulihkan data dari file cadangan sebelumnya.
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={handleResetData}
+            className="p-4 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-left border border-surface-container-high/60 transition-colors group flex flex-col justify-between"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-apple-red mb-3 shadow-sm group-hover:scale-105 transition-transform">
+              <RotateCcw className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-apple-red">Reset Data Awal</p>
+              <p className="text-[11px] text-outline mt-0.5">
+                Kembalikan buku kas ke data contoh default.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleImportFile}
+          className="hidden"
+        />
+      </div>
+
+      {/* Session Management */}
+      <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 sm:p-8 shadow-apple-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-primary">Keluar dari Sesi Ini</h3>
+          <p className="text-xs text-outline mt-0.5">
+            Menghapus cookie aktif peramban (data lokal tetap tersimpan di browser).
+          </p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="px-5 py-2.5 rounded-full border border-apple-red/30 text-apple-red hover:bg-apple-red/10 text-xs font-bold transition-colors flex items-center gap-2 self-start sm:self-auto"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Keluar Sesi</span>
+        </button>
+      </div>
     </div>
   );
 }

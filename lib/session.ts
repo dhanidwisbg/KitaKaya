@@ -1,109 +1,84 @@
+// ============================================================
+// KitaKaya — Session Management (Cookie & Pure Browser State)
+// ============================================================
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
-import { Database } from "@/lib/types/database.types";
+import { User } from "@/lib/types/database.types";
 
 export const USER_COOKIE_NAME = "kitakaya_user_id";
 
-export type UserProfile = Database["public"]["Tables"]["users"]["Row"];
+export type UserProfile = User;
+
+const FALLBACK_USER: UserProfile = {
+  id: "usr_local_primary",
+  email: "dhani@kitakaya.id",
+  full_name: "Dhani",
+  avatar_url: null,
+  monthly_income: 18500000,
+  monthly_budget: 8000000,
+  currency: "IDR",
+  timezone: "Asia/Jakarta",
+  onboarding_completed: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 
 /**
  * Mengambil User ID dari cookies browser (Server Component / Action)
  */
 export async function getSessionUserId(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(USER_COOKIE_NAME)?.value || null;
+  try {
+    const cookieStore = await cookies();
+    return cookieStore.get(USER_COOKIE_NAME)?.value || "usr_local_primary";
+  } catch {
+    return "usr_local_primary";
+  }
 }
 
 /**
- * Mengambil data profil user aktif dari Supabase berdasarkan cookie
+ * Mengambil data profil user untuk Server Component
  */
 export async function getCurrentUser(): Promise<UserProfile | null> {
   const userId = await getSessionUserId();
-  if (!userId) return null;
+  if (!userId) return FALLBACK_USER;
 
-  const supabase = await createClient();
-  const { data: user, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  if (error || !user) {
-    return null;
-  }
-
-  return user;
+  return {
+    ...FALLBACK_USER,
+    id: userId,
+  };
 }
 
 /**
- * Menyimpan nama pengguna baru ke database dan men-set cookies sesi
+ * Menyimpan nama pengguna ke cookie sesi
  */
-export async function registerOrLoginUser(name: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+export async function registerOrLoginUser(
+  name: string
+): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
   const cleanName = name.trim();
   if (!cleanName) {
     return { success: false, error: "Nama tidak boleh kosong" };
   }
 
   const cookieStore = await cookies();
-  let userId = cookieStore.get(USER_COOKIE_NAME)?.value;
+  let userId = cookieStore.get(USER_COOKIE_NAME)?.value || "usr_local_primary";
 
-  const supabase = await createClient();
-
-  if (userId) {
-    // Update profil yang ada jika cookie sudah ada
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (existingUser) {
-      const { data: updated, error: updateErr } = await supabase
-        .from("users")
-        .update({
-          full_name: cleanName,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
-        .select()
-        .single();
-
-      if (!updateErr && updated) {
-        return { success: true, user: updated };
-      }
-    }
-  }
-
-  // Jika belum ada cookie atau user lama tidak ditemukan, generate UUID baru
-  const newUserId = crypto.randomUUID();
-  const { data: newUser, error: insertErr } = await supabase
-    .from("users")
-    .insert({
-      id: newUserId,
-      full_name: cleanName,
-      email: null,
-      monthly_income: 0,
-      monthly_budget: 0,
-      onboarding_completed: true,
-    })
-    .select()
-    .single();
-
-  if (insertErr || !newUser) {
-    return { success: false, error: insertErr?.message || "Gagal membuat sesi pengguna" };
-  }
+  const user: UserProfile = {
+    ...FALLBACK_USER,
+    id: userId,
+    full_name: cleanName,
+    onboarding_completed: true,
+    updated_at: new Date().toISOString(),
+  };
 
   // Simpan ke Cookies (1 tahun)
-  cookieStore.set(USER_COOKIE_NAME, newUserId, {
-    maxAge: 60 * 60 * 24 * 365, // 1 tahun
+  cookieStore.set(USER_COOKIE_NAME, userId, {
+    maxAge: 60 * 60 * 24 * 365,
     path: "/",
-    httpOnly: false, // Boleh diakses client untuk kemudahan sinkronisasi
+    httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
 
-  return { success: true, user: newUser };
+  return { success: true, user };
 }
 
 /**

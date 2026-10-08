@@ -1,19 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { User } from "@/lib/types/database.types";
-import { createClient } from "@/lib/supabase/client";
-import {
-  Search,
-  Bell,
-  Sparkles,
-  LogOut,
-} from "lucide-react";
+import { Sparkles, LogOut, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-import { clearClientUserId } from "@/lib/session-client";
+import { getStoredUser, clearUserSession, subscribeStorage } from "@/lib/storage";
 
 interface AppHeaderProps {
   user?: User | null;
@@ -27,29 +22,42 @@ const navLinks = [
   { label: "Analitik", href: "/analytics" },
 ];
 
-export default function AppHeader({ user }: AppHeaderProps) {
+export default function AppHeader({ user: initialUser }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<User | null>(initialUser || null);
+
+  useEffect(() => {
+    setCurrentUser(getStoredUser());
+    const unsubscribe = subscribeStorage(() => {
+      setCurrentUser(getStoredUser());
+    });
+    return unsubscribe;
+  }, []);
 
   const handleSignOut = async () => {
-    clearClientUserId();
+    clearUserSession();
     await fetch("/api/auth/session", { method: "DELETE" });
     toast.success("Sesi telah keluar");
     router.push("/welcome");
     router.refresh();
   };
 
+  const displayName = currentUser?.full_name || "Dhani";
+
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
+    <header className="fixed top-0 inset-x-0 z-50 bg-white/85 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
       <div className="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-base shadow-sm">
-            K
-          </div>
-          <span className="font-headline font-bold text-lg text-primary tracking-tight">
-            Kita Kaya
-          </span>
+        <Link href="/dashboard" className="flex items-center group">
+          <Image
+            src="/logo.png"
+            alt="Kita Kaya"
+            width={108}
+            height={40}
+            className="h-9 w-auto object-contain group-hover:opacity-80 transition-opacity"
+            priority
+          />
         </Link>
 
         {/* Center Nav Pills (Desktop) */}
@@ -80,9 +88,9 @@ export default function AppHeader({ user }: AppHeaderProps) {
         <div className="flex items-center gap-2.5">
           <Link
             href="/advisor"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary-fixed text-secondary text-xs font-semibold hover:opacity-90 transition-opacity"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-primary text-xs font-semibold transition-colors border border-surface-container-high"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
             <span>AI Advisor</span>
           </Link>
 
@@ -91,16 +99,17 @@ export default function AppHeader({ user }: AppHeaderProps) {
             <Link
               href="/settings"
               className="flex items-center gap-2 p-1 rounded-full hover:bg-surface-container-low transition-colors"
+              title="Pengaturan Akun & Data"
             >
               <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shadow-sm">
-                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : "D"}
+                {displayName.charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:flex items-center gap-1.5 pr-2">
                 <span className="text-xs font-semibold text-primary">
-                  {user?.full_name || user?.email?.split("@")[0] || "Dhani"}
+                  {displayName}
                 </span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-secondary text-white">
-                  PRO
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant">
+                  Lokal
                 </span>
               </div>
             </Link>

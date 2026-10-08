@@ -3,16 +3,18 @@
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, Send, Bot, User as UserIcon, Loader2 } from "lucide-react";
 
+import { getStoredUser, getStoredTransactions, getStoredGoals } from "@/lib/storage";
+
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
 const suggestedPrompts = [
-  "Analisis kebiasaan belanjaku bulan ini 📊",
-  "Gimana cara hemat Rp 500.000 bulan ini? 💡",
-  "Evaluasi alokasi 50/30/20 dari pengeluaranku ⚖️",
-  "Berapa lama lagi target impianku tercapai? 🎯",
+  "Analisis kebiasaan belanjaku bulan ini",
+  "Gimana cara hemat Rp 500.000 bulan ini?",
+  "Evaluasi alokasi 50/30/20 dari pengeluaranku",
+  "Berapa lama lagi target impianku tercapai?",
 ];
 
 export default function AdvisorPage() {
@@ -20,7 +22,7 @@ export default function AdvisorPage() {
     {
       role: "assistant",
       content:
-        "Halo! Saya **KitaKaya AI**, konsultan keuangan pribadimu. Saya dapat menganalisis arus kas, mengevaluasi budget 50/30/20, serta memberi tips cerdas agar target tabunganmu lebih cepat tercapai. Ada yang ingin kamu tanyakan hari ini?",
+        "Halo! Saya **KitaKaya AI**, konsultan keuangan pribadimu. Saya menganalisis arus kas dan tabungan yang tersimpan di browser kamu. Ada yang ingin kamu tanyakan hari ini?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -51,7 +53,14 @@ export default function AdvisorPage() {
       const res = await fetch("/api/ai/advisor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages,
+          context: {
+            profile: getStoredUser(),
+            transactions: getStoredTransactions(),
+            goals: getStoredGoals(),
+          },
+        }),
       });
 
       const data = await res.json();

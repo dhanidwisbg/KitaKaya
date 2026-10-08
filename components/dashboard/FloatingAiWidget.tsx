@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Sparkles, X, Mic, ArrowUp, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { getStoredUser, getStoredTransactions, getStoredGoals } from "@/lib/storage";
+
 interface FloatingAiWidgetProps {
   userName?: string;
 }
@@ -13,7 +15,7 @@ export default function FloatingAiWidget({ userName = "Dhani" }: FloatingAiWidge
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [adviceText, setAdviceText] = useState(
-    `Hai ${userName}! Kamu menghemat 12% lebih banyak minggu ini. Ingin saya alokasikan Rp 1.500.000 surplus ini langsung ke Kantong Dana Darurat?`
+    `Hai ${userName}! Catatan keuanganmu tersimpan aman di browser ini. Ada yang bisa saya bantu analisis hari ini?`
   );
 
   const handleAction = async (prompt: string) => {
@@ -24,6 +26,11 @@ export default function FloatingAiWidget({ userName = "Dhani" }: FloatingAiWidge
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: prompt }],
+          context: {
+            profile: getStoredUser(),
+            transactions: getStoredTransactions(),
+            goals: getStoredGoals(),
+          },
         }),
       });
       const data = await res.json();

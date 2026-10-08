@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getClientUserId } from "@/lib/session-client";
 import { useRouter } from "next/navigation";
@@ -22,8 +21,9 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 
+import { getStoredUser, getStoredTransactions } from "@/lib/storage";
+
 export default function MonthlyReportPage() {
-  const supabase = createClient();
   const router = useRouter();
 
   const [period, setPeriod] = useState("mar-2026");
@@ -35,22 +35,9 @@ export default function MonthlyReportPage() {
   const [userName, setUserName] = useState("Pengguna");
 
   useEffect(() => {
-    async function loadUser() {
-      const userId = getClientUserId();
-      if (userId) {
-        const { data } = await supabase
-          .from("users")
-          .select("full_name, email")
-          .eq("id", userId)
-          .single();
-
-        if (data) {
-          if (data.full_name) setUserName(data.full_name);
-          if (data.email) setUserEmail(data.email);
-        }
-      }
-    }
-    loadUser();
+    const user = getStoredUser();
+    if (user.full_name) setUserName(user.full_name);
+    if (user.email) setUserEmail(user.email);
   }, []);
 
   const handleDownload = () => {
@@ -58,7 +45,7 @@ export default function MonthlyReportPage() {
     setTimeout(() => {
       window.print();
       setIsDownloading(false);
-      toast.success("Dokumen siap dicetak / diunduh sebagai PDF 📄");
+      toast.success("Dokumen siap dicetak / diunduh sebagai PDF");
     }, 500);
   };
 
@@ -71,7 +58,20 @@ export default function MonthlyReportPage() {
 
     setIsSending(true);
     try {
-      const res = await fetch("/api/reports/send", { method: "POST" });
+      const txs = getStoredTransactions();
+      const income = txs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+      const expense = txs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+
+      const res = await fetch("/api/reports/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          userName,
+          totalIncome: income,
+          totalExpense: expense,
+        }),
+      });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -79,7 +79,7 @@ export default function MonthlyReportPage() {
       }
 
       toast.success(
-        data.message || `Laporan finansial berhasil dikirim ke ${userEmail}! 📩`
+        data.message || `Laporan finansial berhasil dikirim ke ${userEmail}!`
       );
     } catch (err: any) {
       toast.error(err.message || "Gagal mengirim laporan");

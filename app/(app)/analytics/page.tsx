@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Transaction } from "@/lib/types/database.types";
 import { formatCurrency, getCategoryConfig } from "@/lib/utils";
-import { getClientUserId } from "@/lib/session-client";
+import { getStoredTransactions, subscribeStorage } from "@/lib/storage";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 import {
   PieChart,
   Pie,
@@ -15,30 +15,26 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
 } from "recharts";
-import { TrendingUp, TrendingDown, PieChart as PieIcon, ArrowUpRight } from "lucide-react";
+import { TrendingUp, TrendingDown, PieChart as PieIcon, ArrowUpRight, BarChart3 } from "lucide-react";
 
 export default function AnalyticsPage() {
-  const supabase = createClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const loadData = () => {
+    setIsLoading(true);
+    const data = getStoredTransactions();
+    setTransactions(data);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    async function loadData() {
-      const userId = getClientUserId();
-
-      if (userId) {
-        const { data } = await supabase
-          .from("transactions")
-          .select("id,type,amount,category,description,date")
-          .eq("user_id", userId);
-
-        if (data) setTransactions(data as any);
-      }
-      setIsLoading(false);
-    }
     loadData();
+    const unsubscribe = subscribeStorage(() => {
+      loadData();
+    });
+    return unsubscribe;
   }, []);
 
   const incomeTx = transactions.filter((t) => t.type === "income");
@@ -60,6 +56,7 @@ export default function AnalyticsPage() {
       const conf = getCategoryConfig(category as any);
       return {
         name: conf.label,
+        categoryKey: category,
         value,
         color: conf.color,
       };
@@ -70,158 +67,197 @@ export default function AnalyticsPage() {
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-apple-primary">
-          Analitik & Laporan Keuangan
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-[11px] font-bold uppercase tracking-wider mb-2">
+          <BarChart3 className="w-3.5 h-3.5 text-primary" />
+          <span>Statistik Keuangan Lokal</span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary font-headline">
+          Analitik & Arus Kas.
         </h1>
-        <p className="text-xs text-apple-secondary">
-          Evaluasi pola pengeluaran, rasio tabungan, dan performa finansialmu.
+        <p className="text-xs sm:text-sm text-outline mt-1">
+          Visualisasi mendalam rasio tabungan, alokasi pengeluaran, dan pola cashflow Anda.
         </p>
       </div>
 
-      {/* Metrics Grid */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-apple-subtle p-5 shadow-apple-card space-y-1">
-          <span className="text-[11px] font-semibold text-apple-secondary uppercase tracking-wider">
-            Total Pemasukan
-          </span>
-          <p className="text-xl font-bold text-apple-green">{formatCurrency(totalIncome)}</p>
-          <p className="text-[10px] text-apple-secondary">Sepanjang waktu</p>
+        <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-outline">
+              Total Pemasukan
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-tertiary-container flex items-center justify-center text-tertiary-on-container">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-primary font-headline tabular-nums">
+            {formatCurrency(totalIncome)}
+          </div>
+          <p className="text-[11px] text-tertiary-on-container mt-1 font-medium">
+            {incomeTx.length} transaksi tercatat
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-apple-subtle p-5 shadow-apple-card space-y-1">
-          <span className="text-[11px] font-semibold text-apple-secondary uppercase tracking-wider">
-            Total Pengeluaran
-          </span>
-          <p className="text-xl font-bold text-apple-red">{formatCurrency(totalExpense)}</p>
-          <p className="text-[10px] text-apple-secondary">Sepanjang waktu</p>
+        <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-outline">
+              Total Pengeluaran
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-apple-red/10 flex items-center justify-center text-apple-red">
+              <TrendingDown className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-primary font-headline tabular-nums">
+            {formatCurrency(totalExpense)}
+          </div>
+          <p className="text-[11px] text-outline mt-1">
+            {expenseTx.length} transaksi operasional
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-apple-subtle p-5 shadow-apple-card space-y-1">
-          <span className="text-[11px] font-semibold text-apple-secondary uppercase tracking-wider">
-            Rasio Tabungan
-          </span>
-          <p className="text-xl font-bold text-apple-primary">{savingsRate}%</p>
-          <p className="text-[10px] text-apple-secondary">
-            {savingsRate >= 20 ? "Kondisi sangat sehat ✅" : "Tingkatkan tabungan ⚠️"}
+        <div className="bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-outline">
+              Rasio Tabungan
+            </span>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-secondary-fixed text-secondary">
+              50/30/20
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-primary font-headline tabular-nums">
+            {savingsRate}%
+          </div>
+          <p className="text-[11px] text-outline mt-1">
+            Surplus: {formatCurrency(netSavings)}
           </p>
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Category Breakdown (Pie Chart) */}
-        <div className="bg-white rounded-3xl border border-apple-subtle p-6 shadow-apple-card space-y-4">
-          <div className="flex items-center gap-2">
-            <PieIcon className="w-4 h-4 text-apple-blue" />
-            <h2 className="text-sm font-semibold text-apple-primary">
-              Distribusi Pengeluaran
-            </h2>
-          </div>
-
-          {categoryData.length === 0 ? (
-            <div className="h-56 flex items-center justify-center text-xs text-apple-secondary border border-dashed border-apple-subtle rounded-2xl">
-              Belum ada data pengeluaran
+      {/* Chart Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Doughnut Chart */}
+        <div className="lg:col-span-5 bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-headline text-base font-bold text-primary">
+                Breakdown Pengeluaran
+              </h2>
+              <PieIcon className="w-4 h-4 text-outline" />
             </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="w-48 h-48">
+            <p className="text-xs text-outline">Proporsi per kategori pengeluaran</p>
+
+            {categoryData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-xs text-outline">
+                Belum ada data pengeluaran
+              </div>
+            ) : (
+              <div className="h-64 my-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
+                      dataKey="value"
+                      nameKey="name"
                       cx="50%"
                       cy="50%"
-                      innerRadius={45}
-                      outerRadius={75}
-                      paddingAngle={4}
-                      dataKey="value"
+                      innerRadius={65}
+                      outerRadius={95}
+                      paddingAngle={3}
                     >
                       {categoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(val: any) => formatCurrency(Number(val))}
+                      formatter={(value: any) => formatCurrency(Number(value))}
                       contentStyle={{
-                        borderRadius: "12px",
-                        fontSize: "11px",
-                        border: "1px solid #E5E5EA",
+                        borderRadius: "16px",
+                        border: "1px solid #e5e7eb",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                        fontSize: "12px",
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
+            )}
+          </div>
 
-              {/* Legend List */}
-              <div className="flex-1 space-y-2 w-full">
-                {categoryData.slice(0, 5).map((item, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-apple-secondary">{item.name}</span>
-                    </div>
-                    <span className="font-semibold text-apple-primary">
-                      {formatCurrency(item.value)}
-                    </span>
-                  </div>
-                ))}
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {categoryData.map((cat) => (
+              <div
+                key={cat.name}
+                className="flex items-center justify-between p-2 rounded-xl bg-surface-container-low/60 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                  <span className="font-medium text-primary">{cat.name}</span>
+                </div>
+                <span className="font-bold text-primary tabular-nums">
+                  {formatCurrency(cat.value)}
+                </span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
-        {/* 50/30/20 Budgeting Rule Analysis */}
-        <div className="bg-white rounded-3xl border border-apple-subtle p-6 shadow-apple-card space-y-4 flex flex-col justify-between">
+        {/* Bar Chart: Cashflow */}
+        <div className="lg:col-span-7 bg-surface-container-lowest rounded-3xl border border-surface-container-high/60 p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-apple-primary">
-              Penerapan Kaidah 50/30/20
-            </h2>
-            <p className="text-xs text-apple-secondary mt-1">
-              Standar baku alokasi keuangan sehat untuk stabilitas jangka panjang.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {/* Needs (50%) */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-apple-primary">Kebutuhan Pokok (Needs) — Max 50%</span>
-                <span className="text-apple-secondary">Target: 50%</span>
-              </div>
-              <div className="w-full bg-apple-subtle/50 rounded-full h-2.5 overflow-hidden">
-                <div className="h-full bg-apple-blue rounded-full w-1/2" />
-              </div>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-headline text-base font-bold text-primary">
+                Perbandingan Arus Kas
+              </h2>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                Bulan Ini
+              </span>
             </div>
+            <p className="text-xs text-outline">Komparasi total masuk vs total keluar</p>
 
-            {/* Wants (30%) */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-apple-primary">Keinginan & Lifestyle (Wants) — Max 30%</span>
-                <span className="text-apple-secondary">Target: 30%</span>
-              </div>
-              <div className="w-full bg-apple-subtle/50 rounded-full h-2.5 overflow-hidden">
-                <div className="h-full bg-purple-500 rounded-full w-[30%]" />
-              </div>
-            </div>
-
-            {/* Savings (20%) */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-apple-primary">Tabungan & Investasi (Savings) — Min 20%</span>
-                <span className="text-apple-secondary">Target: 20%</span>
-              </div>
-              <div className="w-full bg-apple-subtle/50 rounded-full h-2.5 overflow-hidden">
-                <div className="h-full bg-apple-green rounded-full w-1/5" />
-              </div>
+            <div className="h-64 my-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { name: "Pemasukan", amount: totalIncome, fill: "#009a3b" },
+                    { name: "Pengeluaran", amount: totalExpense, fill: "#e11d48" },
+                    { name: "Surplus Bersih", amount: Math.max(0, netSavings), fill: "#005ab7" },
+                  ]}
+                  margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
+                >
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    tickFormatter={(v) => `Rp ${(v / 1_000_000).toFixed(0)}jt`}
+                  />
+                  <Tooltip
+                    formatter={(value: any) => formatCurrency(Number(value))}
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "1px solid #e5e7eb",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Bar dataKey="amount" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-apple-surface/80 border border-apple-subtle text-xs text-apple-secondary leading-relaxed">
-            💡 <strong>Saran Finansial:</strong> Alokasikan tabungan segera setelah gajian
-            sebelum membelanjakan pos keinginan (Wants).
+          <div className="p-4 rounded-2xl bg-surface-container-low border border-surface-container-high/60 flex items-center justify-between text-xs">
+            <span className="text-outline">
+              Status Arus Kas:{" "}
+              <strong className="text-primary font-bold">
+                {netSavings >= 0 ? "Surplus Positif" : "Defisit"}
+              </strong>
+            </span>
+            <span className="text-tertiary-on-container font-bold tabular-nums">
+              {netSavings >= 0 ? "+" : ""}
+              {formatCurrency(netSavings)}
+            </span>
           </div>
         </div>
       </div>

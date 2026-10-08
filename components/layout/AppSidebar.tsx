@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -10,12 +11,11 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  PlusCircle,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { User } from "@/lib/types/database.types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { clearUserSession } from "@/lib/storage";
 
 interface AppSidebarProps {
   user?: User | null;
@@ -33,12 +33,12 @@ const navItems = [
 export default function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    clearUserSession();
+    await fetch("/api/auth/session", { method: "DELETE" });
     toast.success("Berhasil keluar");
-    router.push("/login");
+    router.push("/welcome");
     router.refresh();
   };
 
@@ -46,9 +46,15 @@ export default function AppSidebar({ user }: AppSidebarProps) {
     <aside className="hidden lg:flex flex-col w-64 border-r border-apple-subtle bg-apple-white h-screen fixed top-0 left-0 p-5 z-40 justify-between">
       <div>
         {/* Brand */}
-        <div className="flex items-center gap-2 px-2 py-3 mb-6">
-          <div className="w-8 h-8 rounded-xl bg-apple-primary flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            K
+        <div className="flex items-center gap-2.5 px-2 py-3 mb-6">
+          <div className="w-8 h-8 rounded-xl overflow-hidden bg-black flex items-center justify-center shadow-sm">
+            <Image
+              src="/icon.png"
+              alt="KitaKaya"
+              width={32}
+              height={32}
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <h1 className="font-semibold tracking-tight text-apple-primary leading-none">
@@ -109,10 +115,10 @@ export default function AppSidebar({ user }: AppSidebarProps) {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-medium text-apple-primary truncate">
-                {user?.full_name || user?.email?.split("@")[0] || "Pengguna"}
+                {user?.full_name || "Pengguna"}
               </p>
               <p className="text-[10px] text-apple-secondary truncate">
-                {user?.currency || "IDR"} Account
+                Lokal Browser • IDR
               </p>
             </div>
           </div>

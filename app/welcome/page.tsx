@@ -14,7 +14,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-[#faf9fe] flex flex-col selection:bg-primary selection:text-white">
       {/* Minimal Header */}
       <header className="fixed top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
-        <div className="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="h-16 max-w-[1600px] 2xl:max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between">
           <Link href="/" className="flex items-center group">
             <Image
               src="/logo.png"

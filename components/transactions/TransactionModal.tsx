@@ -114,10 +114,10 @@ export default function TransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-lg max-h-[92vh] flex flex-col bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container-high/60">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-surface-container-high/60 shrink-0">
           <div>
             <h2 className="text-base font-bold text-primary font-headline">
               {transactionToEdit ? "Edit Catatan Transaksi" : "Tambah Transaksi Baru"}
@@ -135,7 +135,7 @@ export default function TransactionModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
           {/* Tipe: Pemasukan / Pengeluaran Pill Switcher */}
           <div className="flex bg-surface-container-low p-1 rounded-2xl border border-surface-container-high/50">
             <button

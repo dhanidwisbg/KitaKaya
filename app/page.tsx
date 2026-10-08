@@ -25,7 +25,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-[#faf9fe] text-[#1a1b1f] selection:bg-primary selection:text-white">
       {/* 1. Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1600px] 2xl:max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center group">
             <Image
               src="/logo.png"
@@ -133,7 +133,7 @@ export default function LandingPage() {
         </div>
 
         {/* 3. Hero Visual Artifact (Interactive Mockup Preview) */}
-        <div className="max-w-5xl mx-auto mt-16 relative z-10 animate-fade-in">
+        <div className="max-w-6xl 2xl:max-w-7xl mx-auto mt-12 sm:mt-16 relative z-10 animate-fade-in">
           <div className="rounded-3xl bg-white p-6 sm:p-8 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,0.06)] border border-surface-container-high/80 relative overflow-hidden">
             {/* Top Bar of the Mockup */}
             <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-surface-container-high/60">
@@ -258,8 +258,8 @@ export default function LandingPage() {
       </section>
 
       {/* 4. Comparison Section: Kenapa KitaKaya Berbeda */}
-      <section id="comparison" className="py-20 px-6 bg-white border-y border-surface-container-high/60">
-        <div className="max-w-5xl mx-auto">
+      <section id="comparison" className="py-20 px-4 sm:px-6 bg-white border-y border-surface-container-high/60">
+        <div className="max-w-6xl 2xl:max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <span className="text-[11px] font-bold uppercase tracking-wider text-outline">
               Bandingkan & Rasakan Bedanya
@@ -378,8 +378,8 @@ export default function LandingPage() {
       </section>
 
       {/* 6. Workflow Section */}
-      <section id="workflow" className="py-20 px-6 bg-white border-t border-surface-container-high/60">
-        <div className="max-w-5xl mx-auto">
+      <section id="workflow" className="py-20 px-4 sm:px-6 bg-white border-t border-surface-container-high/60">
+        <div className="max-w-6xl 2xl:max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <span className="text-[11px] font-bold uppercase tracking-wider text-outline">
               Alur Penggunaan
@@ -449,8 +449,8 @@ export default function LandingPage() {
       </section>
 
       {/* 8. Footer */}
-      <footer className="border-t border-surface-container-high/60 py-10 px-6 bg-surface-container-lowest text-xs text-outline">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-surface-container-high/60 py-10 px-4 sm:px-6 lg:px-10 bg-surface-container-lowest text-xs text-outline">
+        <div className="max-w-[1600px] 2xl:max-w-[1780px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <Image src="/icon.png" width={24} height={24} alt="KitaKaya" className="w-6 h-6 object-contain" />
             <span className="font-headline font-bold text-sm text-primary">Kita Kaya</span>

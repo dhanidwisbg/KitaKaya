@@ -71,10 +71,10 @@ export default function DepositModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-md max-h-[92vh] flex flex-col bg-white rounded-3xl border border-surface-container-high/80 shadow-2xl overflow-hidden animate-scale-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-container-high/60">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-surface-container-high/60 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary border border-surface-container-high">
               <CategoryIcon name={goal.icon || "Shield"} size={20} />
@@ -93,7 +93,7 @@ export default function DepositModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-primary uppercase tracking-wider text-[11px]">
               Nominal Setoran (Rp)

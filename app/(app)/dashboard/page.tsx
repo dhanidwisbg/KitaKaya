@@ -372,11 +372,11 @@ export default function DashboardPage() {
 
             {/* Big Metric */}
             <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-2xl font-medium text-outline-variant">Rp</span>
-              <span className="font-headline text-5xl sm:text-6xl font-bold tracking-tighter text-primary tabular-nums">
+              <span className="text-xl sm:text-2xl font-medium text-outline-variant">Rp</span>
+              <span className="font-headline text-3xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-primary tabular-nums break-words">
                 {netBalance.toLocaleString("id-ID")}
               </span>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono">
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono">
                 IDR • LOKAL
               </span>
             </div>

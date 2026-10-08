@@ -23,8 +23,8 @@ export default function AppBottomNav() {
   const pathname = usePathname();
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-apple-white/90 backdrop-blur-md border-t border-apple-subtle px-3 py-2">
-      <nav className="flex items-center justify-around">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-surface-container-high/70 px-2 pt-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
+      <nav className="flex items-center justify-around max-w-lg mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -36,14 +36,14 @@ export default function AppBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition-colors",
+                "flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-2xl transition-all min-w-[56px] min-h-[46px]",
                 isActive
-                  ? "text-apple-blue font-semibold"
-                  : "text-apple-secondary hover:text-apple-primary"
+                  ? "text-primary font-bold bg-surface-container-low shadow-sm"
+                  : "text-outline hover:text-primary active:scale-95"
               )}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px]">{item.label}</span>
+              <Icon className={cn("w-5 h-5", isActive ? "text-primary stroke-[2.2]" : "stroke-[1.8]")} />
+              <span className="text-[10px] tracking-tight">{item.label}</span>
             </Link>
           );
         })}

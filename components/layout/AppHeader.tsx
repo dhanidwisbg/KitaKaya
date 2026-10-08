@@ -47,7 +47,7 @@ export default function AppHeader({ user: initialUser }: AppHeaderProps) {
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 bg-white/85 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
-      <div className="h-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      <div className="h-16 max-w-[1600px] 2xl:max-w-[1780px] mx-auto px-3.5 sm:px-6 lg:px-8 xl:px-10 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center group">
           <Image

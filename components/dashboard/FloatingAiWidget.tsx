@@ -48,7 +48,7 @@ export default function FloatingAiWidget({ userName = "Dhani" }: FloatingAiWidge
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 p-3.5 rounded-full bg-primary text-white shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group"
+        className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 p-3 sm:p-3.5 rounded-full bg-primary text-white shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group border border-white/10"
       >
         <Sparkles className="w-5 h-5 text-secondary-fixed group-hover:rotate-12 transition-transform" />
         <span className="text-xs font-semibold pr-1 hidden sm:inline">Asisten Finansial</span>
@@ -58,7 +58,7 @@ export default function FloatingAiWidget({ userName = "Dhani" }: FloatingAiWidge
   }
 
   return (
-    <aside className="fixed bottom-6 right-6 z-40 w-[380px] max-w-[calc(100vw-3rem)] rounded-3xl bg-surface-container-lowest/95 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-surface-container-high/70 p-4 flex flex-col gap-3 transition-all duration-300 animate-scale-up">
+    <aside className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 left-3 sm:left-auto w-auto sm:w-[380px] max-w-sm z-40 rounded-3xl bg-surface-container-lowest/95 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-surface-container-high/70 p-4 flex flex-col gap-3 transition-all duration-300 animate-scale-up max-h-[calc(100vh-7rem)] overflow-y-auto">
       {/* Header with Pulse Indicator */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+﻿import { NextResponse } from "next/server";
 import { USER_COOKIE_NAME } from "@/lib/session";
+import { generateId } from "@/lib/db/indexeddb";
 
 export async function POST(request: Request) {
   try {
@@ -14,41 +14,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const newUserId = crypto.randomUUID();
+    // Generate new user ID
+    const newUserId = generateId();
 
-    // Simpan data profil awal ke tabel users
-    const { data: newUser, error: insertErr } = await supabase
-      .from("users")
-      .insert({
-        id: newUserId,
-        full_name: cleanName,
-        email: null,
-        monthly_income: 0,
-        monthly_budget: 0,
-        onboarding_completed: true,
-      })
-      .select()
-      .single();
-
-    if (insertErr || !newUser) {
-      console.error("Gagal membuat user:", insertErr);
-      return NextResponse.json(
-        { error: insertErr?.message || "Gagal membuat sesi pengguna" },
-        { status: 500 }
-      );
-    }
-
-    // Buat response dengan cookie sesi 1 tahun
+    // Create response with session cookie (1 year)
     const response = NextResponse.json({
       success: true,
-      user: newUser,
+      user: {
+        id: newUserId,
+        name: cleanName,
+        currency: "IDR",
+        onboarding_completed: true,
+      },
     });
 
     response.cookies.set(USER_COOKIE_NAME, newUserId, {
       path: "/",
-      maxAge: 60 * 60 * 24 * 365, // 1 tahun
-      httpOnly: false, // Memungkinkan sinkronisasi cepat di browser
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      httpOnly: false, // Allow browser sync
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });

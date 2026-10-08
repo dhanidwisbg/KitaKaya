@@ -1,13 +1,23 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Database } from "@/lib/types/database.types";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Check if Supabase is properly configured
+  const isConfigured = 
+    supabaseUrl && 
+    supabaseAnonKey && 
+    supabaseUrl.startsWith("http") && 
+    !supabaseUrl.includes("placeholder");
+
+  if (!isConfigured) {
+    console.warn("Supabase is not configured. Running in demo mode.");
+    return null as any;
+  }
 
   return createServerClient<Database>(
     supabaseUrl,
@@ -33,10 +43,20 @@ export async function createClient() {
 
 export async function createServiceClient() {
   const cookieStore = await cookies();
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-  const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Check if Supabase is properly configured
+  const isConfigured = 
+    supabaseUrl && 
+    serviceKey && 
+    supabaseUrl.startsWith("http") && 
+    !supabaseUrl.includes("placeholder");
+
+  if (!isConfigured) {
+    console.warn("Supabase is not configured. Running in demo mode.");
+    return null as any;
+  }
 
   return createServerClient<Database>(
     supabaseUrl,

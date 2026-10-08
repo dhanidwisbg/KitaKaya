@@ -121,7 +121,7 @@ export function initUserWithName(name: string): User {
   const current = getStoredUser();
   // Only mark fully onboarded if income is already configured (returning user after logout).
   // New users (income = 0) will still need to complete the income/budget step on dashboard.
-  const isReturningUser = current.monthly_income > 0;
+  const isReturningUser = (current.monthly_income ?? 0) > 0;
   const updated: User = {
     ...current,
     full_name: cleanName || "Pengguna",

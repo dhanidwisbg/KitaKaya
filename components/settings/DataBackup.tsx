@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { Download, Upload, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -41,7 +41,13 @@ export default function DataBackup() {
       <h3 className="text-lg font-bold text-gray-900 mb-4">Backup & Restore Data</h3>
       
       {message && (
-        <div className={lex items-center gap-2 p-3 rounded-xl mb-4 }>
+        <div
+          className={`flex items-center gap-2 p-3 rounded-xl mb-4 ${
+            message.type === "success"
+              ? "bg-green-50 text-green-700"
+              : "bg-red-50 text-red-700"
+          }`}
+        >
           {message.type === "success" ? (
             <CheckCircle2 className="w-4 h-4" />
           ) : (

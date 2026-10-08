@@ -1,4 +1,4 @@
-﻿// IndexedDB Database for KitaKaya
+// IndexedDB Database for KitaKaya
 // Local storage with export/import capabilities
 
 const DB_NAME = "kitakaya_db";
@@ -305,7 +305,7 @@ export const db = new KitaKayaDB();
 
 // Helper functions
 export function generateId(): string {
-  return ${Date.now()}-;
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
 export function formatDate(date: Date): string {

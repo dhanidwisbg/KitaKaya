@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { db, generateId, formatDate } from "./indexeddb";
 import type { User, Transaction, Goal, Saving, Category, Settings } from "./indexeddb";
 
@@ -348,7 +348,7 @@ export function useDatabase() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = kitakaya-backup-.json;
+    a.download = `kitakaya-backup-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }, []);

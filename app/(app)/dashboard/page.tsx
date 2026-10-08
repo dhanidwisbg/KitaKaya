@@ -278,7 +278,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-bold text-primary">
                   Target Pemasukan Bulanan: {formatCurrency(user.monthly_income)}
                 </p>
-                {user.monthly_budget > 0 && (
+                {user.monthly_budget != null && user.monthly_budget > 0 && (
                   <p className="text-[11px] text-outline mt-0.5">
                     Batas Pengeluaran: {formatCurrency(user.monthly_budget)} ·{" "}
                     Target Tabungan: {formatCurrency(user.monthly_income - user.monthly_budget)}
